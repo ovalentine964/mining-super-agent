@@ -21,8 +21,8 @@ tools:
     fallback:
       tools: ["query_mindat", "usgs_mrdata_query"]
 
-  run_gempy_model:
-    name: "run_gempy_model"
+  gempy_3d_model:
+    name: "gempy_3d_model"
     description: "Run GemPy 3D geological model"
     module: "src.tools.geological.gempy_3d_model"
     permissions: ["read:geo", "compute:geo"]
@@ -182,10 +182,10 @@ tools:
   # =========================================================================
   # MINERAL ID TOOLS
   # =========================================================================
-  identify_mineral_photo:
-    name: "identify_mineral_photo"
+  identify_mineral_from_photo:
+    name: "identify_mineral_from_photo"
     description: "Identify mineral from photo using EfficientNet-B4"
-    module: "src.agents.mineral_id.identify_mineral_photo"
+    module: "src.tools.vision.identify_mineral_from_photo"
     permissions: ["read:vision", "model:efficientnet"]
     timeout_seconds: 30
     rate_limit:
@@ -196,6 +196,21 @@ tools:
       ttl_seconds: 86400  # Same image = same result
     fallback:
       tools: ["classify_with_clip"]
+
+  xrf_analysis:
+    name: "xrf_analysis"
+    description: "Process XRF spectral data for precise mineral identification"
+    module: "src.tools.vision.analyze_xrf"
+    permissions: ["read:vision"]
+    timeout_seconds: 15
+    rate_limit:
+      requests_per_minute: 30
+      requests_per_hour: 500
+    cache:
+      enabled: true
+      ttl_seconds: 3600
+    fallback:
+      tools: []
 
   check_look_alikes:
     name: "check_look_alikes"
@@ -435,7 +450,7 @@ tools:
   query_mining_act:
     name: "query_mining_act"
     description: "Query Kenya Mining Act 2016"
-    module: "src.agents.legal.query_mining_act"
+    module: "src.tools.legal.query_mining_act"
     permissions: ["read:legal"]
     timeout_seconds: 10
     rate_limit:
@@ -444,6 +459,21 @@ tools:
     cache:
       enabled: true
       ttl_seconds: 604800  # 1 week — law text is static
+    fallback:
+      tools: []
+
+  licensing_info:
+    name: "licensing_info"
+    description: "Get licensing requirements and procedures"
+    module: "src.tools.legal.get_licensing_info"
+    permissions: ["read:legal"]
+    timeout_seconds: 10
+    rate_limit:
+      requests_per_minute: 60
+      requests_per_hour: 1000
+    cache:
+      enabled: true
+      ttl_seconds: 86400
     fallback:
       tools: []
 
@@ -507,6 +537,53 @@ tools:
     cache:
       enabled: true
       ttl_seconds: 3600
+    fallback:
+      tools: []
+
+  npv_calculator:
+    name: "npv_calculator"
+    description: "Calculate NPV/IRR for mining projects"
+    module: "src.tools.financial.calculate_npv"
+    permissions: ["compute:financial"]
+    timeout_seconds: 15
+    rate_limit:
+      requests_per_minute: 30
+      requests_per_hour: 200
+    cache:
+      enabled: true
+      ttl_seconds: 3600
+    fallback:
+      tools: []
+
+  value_estimator:
+    name: "value_estimator"
+    description: "Estimate mineral deposit value"
+    module: "src.tools.financial.estimate_value"
+    permissions: ["compute:financial", "read:market"]
+    timeout_seconds: 15
+    rate_limit:
+      requests_per_minute: 30
+      requests_per_hour: 200
+    cache:
+      enabled: true
+      ttl_seconds: 3600
+    fallback:
+      tools: []
+
+  # =========================================================================
+  # REPORT TOOLS
+  # =========================================================================
+  generate_report:
+    name: "generate_report"
+    description: "Generate a professional PDF geological report"
+    module: "src.tools.reports.generate_pdf"
+    permissions: ["read:reports", "write:reports"]
+    timeout_seconds: 60
+    rate_limit:
+      requests_per_minute: 10
+      requests_per_hour: 50
+    cache:
+      enabled: false
     fallback:
       tools: []
 

@@ -27,6 +27,11 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+class ToolNotFoundError(Exception):
+    """Raised when a tool is not found in the registry."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Pydantic models for tool configuration
 # ---------------------------------------------------------------------------
@@ -239,6 +244,8 @@ class ToolRegistry:
     def __init__(self, config_path: Optional[str] = None):
         self._tools: dict[str, ToolConfig] = {}
         self._handlers: dict[str, Callable] = {}
+        self._input_schemas: dict[str, type[BaseModel]] = {}
+        self._output_schemas: dict[str, type[BaseModel]] = {}
         self._rate_limiters: dict[str, RateLimiter] = {}
         self._caches: dict[str, CacheManager] = {}
 
@@ -257,6 +264,8 @@ class ToolRegistry:
 
         tools_config = data.get("tools", {})
         for tool_name, tool_data in tools_config.items():
+            # Remove 'name' from tool_data to avoid duplicate keyword
+            tool_data.pop('name', None)
             config = ToolConfig(name=tool_name, **tool_data)
             self.register_config(config)
 
@@ -269,11 +278,21 @@ class ToolRegistry:
         self._caches[config.name] = CacheManager(config.cache)
         logger.debug(f"Registered tool config: {config.name}")
 
-    def register_handler(self, tool_name: str, handler: Callable) -> None:
-        """Register a callable handler for a tool."""
+    def register_handler(
+        self,
+        tool_name: str,
+        handler: Callable,
+        input_schema: Optional[type[BaseModel]] = None,
+        output_schema: Optional[type[BaseModel]] = None,
+    ) -> None:
+        """Register a callable handler for a tool with optional Pydantic schemas."""
         if tool_name not in self._tools:
             logger.warning(f"Registering handler for unconfigured tool: {tool_name}")
         self._handlers[tool_name] = handler
+        if input_schema is not None:
+            self._input_schemas[tool_name] = input_schema
+        if output_schema is not None:
+            self._output_schemas[tool_name] = output_schema
 
     def get_handler(self, tool_name: str) -> Optional[Callable]:
         """Get the handler for a tool."""
@@ -323,11 +342,11 @@ class ToolRegistry:
         bypass_cache: bool = False,
     ) -> dict[str, Any]:
         """
-        Execute a tool with rate limiting, caching, and fallback.
+        Execute a tool with rate limiting, caching, validation, and fallback.
 
         Args:
             tool_name: Name of the tool to execute
-            arguments: Tool arguments (will be validated)
+            arguments: Tool arguments (validated against Pydantic input_schema if registered)
             permissions: Agent's permissions (for checking)
             bypass_cache: Skip cache lookup
 
@@ -335,13 +354,14 @@ class ToolRegistry:
             Tool execution result as dict
 
         Raises:
+            ToolNotFoundError: If tool is not in the registry
             PermissionError: If agent lacks required permissions
             TimeoutError: If tool execution exceeds timeout
-            ValueError: If arguments are invalid
+            ValueError: If arguments are invalid (schema validation failure)
         """
         config = self._tools.get(tool_name)
         if not config:
-            raise ValueError(f"Tool '{tool_name}' not found in registry")
+            raise ToolNotFoundError(f"Tool '{tool_name}' not found in registry")
 
         if not config.enabled:
             raise ValueError(f"Tool '{tool_name}' is disabled")
@@ -351,6 +371,15 @@ class ToolRegistry:
             for perm in config.permissions:
                 if perm not in permissions:
                     raise PermissionError(f"Missing permission '{perm}' for tool '{tool_name}'")
+
+        # Runtime argument validation against Pydantic input schema
+        input_schema = self._input_schemas.get(tool_name)
+        if input_schema is not None:
+            try:
+                validated_input = input_schema(**arguments)
+                arguments = validated_input.model_dump()
+            except Exception as e:
+                raise ValueError(f"Invalid arguments for tool '{tool_name}': {e}") from e
 
         # Cache check
         if not bypass_cache:
@@ -374,6 +403,17 @@ class ToolRegistry:
                 self._run_handler(handler, arguments),
                 timeout=config.timeout_seconds,
             )
+
+            # Runtime output validation against Pydantic output schema
+            output_schema = self._output_schemas.get(tool_name)
+            if output_schema is not None:
+                try:
+                    if isinstance(result, dict):
+                        validated_output = output_schema(**result)
+                        result = validated_output.model_dump()
+                except Exception as e:
+                    logger.warning(f"Output validation failed for '{tool_name}': {e}")
+                    # Don't block on output validation — log and continue
 
             # Cache result
             await self._caches[tool_name].put(tool_name, arguments, result)

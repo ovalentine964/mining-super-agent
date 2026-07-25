@@ -197,3 +197,28 @@ def _format_swahili_result(result: Any) -> str:
     conf = int(result.confidence * 100)
     
     return f"Madini: {name}. Uhakika: {conf}%. {DISCLAIMER_SW}"
+
+
+def register_vision_tools(registry) -> None:
+    """Register all vision tools with the tool registry."""
+    from .schemas import MineralPhotoInput, MineralPhotoOutput, XRFInput, XFROutput
+
+    registry.register_handler(
+        "identify_mineral_from_photo",
+        identify_mineral_from_photo,
+        input_schema=MineralPhotoInput,
+        output_schema=MineralPhotoOutput,
+    )
+    # Alias for shorter tool name
+    registry.register_handler(
+        "mineral_photo_id",
+        identify_mineral_from_photo,
+        input_schema=MineralPhotoInput,
+        output_schema=MineralPhotoOutput,
+    )
+    registry.register_handler(
+        "xrf_analysis",
+        analyze_xrf,
+        input_schema=XRFInput,
+        output_schema=XFROutput,
+    )

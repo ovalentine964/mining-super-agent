@@ -71,3 +71,15 @@ async def generate_pdf(
             "Please obtain professional verification before making economic decisions."
         ),
     }
+
+
+def register_report_tools(registry) -> None:
+    """Register all report tools with the tool registry."""
+    from .schemas import ReportInput, ReportOutput
+
+    registry.register_handler(
+        "generate_report",
+        generate_pdf,
+        input_schema=ReportInput,
+        output_schema=ReportOutput,
+    )

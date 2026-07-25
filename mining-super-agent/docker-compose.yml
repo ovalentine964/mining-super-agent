@@ -31,6 +31,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     # NO port mapping — internal network only
 
   # ─── Redis (cache + sessions + rate limiting) ────────────────
@@ -64,6 +69,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     # NO port mapping — internal network only
 
   # ─── Qdrant (vector database for embeddings) ─────────────────
@@ -90,6 +100,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─── MinIO (S3-compatible object storage) ────────────────────
   minio:
@@ -117,6 +132,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─── FastAPI Application ─────────────────────────────────────
   app:
@@ -147,6 +167,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
       JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:?JWT_REFRESH_SECRET_KEY must be set}
       API_KEYS_ENCRYPTION_KEY: ${API_KEYS_ENCRYPTION_KEY:?API_KEYS_ENCRYPTION_KEY must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      MFA_ISSUER_NAME: ${MFA_ISSUER_NAME:-Mining Super-Agent}
       # External APIs
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -158,6 +180,12 @@ services:
         reservations:
           cpus: "0.5"
           memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,6 +193,11 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─── Caddy (reverse proxy, auto-TLS, HSTS) ──────────────────
   caddy:
@@ -183,13 +216,23 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "0.25"
           memory: 256M
         reservations:
           cpus: "0.1"
           memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     depends_on:
       - app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   internal:

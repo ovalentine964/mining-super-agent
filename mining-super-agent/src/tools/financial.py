@@ -158,3 +158,21 @@ def _format_npv_swahili(npv: float, irr: float | None, payback: float | None) ->
     parts.append(DISCLAIMER_FINANCIAL)
     
     return ". ".join(parts)
+
+
+def register_financial_tools(registry) -> None:
+    """Register all financial tools with the tool registry."""
+    from .schemas import NPVInput, NPVOutput, ValueEstimateInput, ValueEstimateOutput
+
+    registry.register_handler(
+        "npv_calculator",
+        calculate_npv,
+        input_schema=NPVInput,
+        output_schema=NPVOutput,
+    )
+    registry.register_handler(
+        "value_estimator",
+        estimate_value,
+        input_schema=ValueEstimateInput,
+        output_schema=ValueEstimateOutput,
+    )

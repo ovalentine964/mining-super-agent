@@ -1,47 +1,31 @@
-/// Commodity price model for market data.
 class CommodityPrice {
-  final String symbol;
   final String name;
-  final double priceUsd;
-  final double priceKes;
-  final double changePercent;
+  final String symbol;
+  final double price;
+  final String currency;
   final String unit;
-  final List<double> history; // 7-day price history
+  final double changePercent;
+  final DateTime timestamp;
 
   CommodityPrice({
-    required this.symbol,
     required this.name,
-    required this.priceUsd,
-    required this.priceKes,
-    required this.changePercent,
+    required this.symbol,
+    required this.price,
+    required this.currency,
     required this.unit,
-    this.history = const [],
+    required this.changePercent,
+    required this.timestamp,
   });
 
   factory CommodityPrice.fromJson(Map<String, dynamic> json) {
     return CommodityPrice(
-      symbol: json['symbol'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      priceUsd: (json['price_usd'] as num?)?.toDouble() ?? 0.0,
-      priceKes: (json['price_kes'] as num?)?.toDouble() ?? 0.0,
-      changePercent: (json['change_percent'] as num?)?.toDouble() ?? 0.0,
-      unit: json['unit'] as String? ?? 'oz',
-      history: (json['history'] as List<dynamic>?)
-              ?.map((e) => (e as num).toDouble())
-              .toList() ??
-          [],
+      name: json['name'] ?? '',
+      symbol: json['symbol'] ?? '',
+      price: (json['price'] ?? 0).toDouble(),
+      currency: json['currency'] ?? 'USD',
+      unit: json['unit'] ?? '',
+      changePercent: (json['change_percent'] ?? 0).toDouble(),
+      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'symbol': symbol,
-      'name': name,
-      'price_usd': priceUsd,
-      'price_kes': priceKes,
-      'change_percent': changePercent,
-      'unit': unit,
-      'history': history,
-    };
   }
 }

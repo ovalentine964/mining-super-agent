@@ -1,339 +1,142 @@
 """
-Quantum Machine Learning — Variational Quantum Classifier for geological prediction.
-
-Uses PennyLane parameterized quantum circuits as a trainable classifier,
-with hybrid quantum-classical optimization loop.
+Quantum ML module — PennyLane quantum circuits for mining-specific ML tasks.
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-from numpy.typing import NDArray
-
-from .quantum_config import QuantumConfig, QuantumBackend, DEFAULT_CONFIG
-from .classical_fallback import ClassicalFallback, BenchmarkResult
 
 logger = logging.getLogger(__name__)
 
-_pennylane = None
-_qml = None
 
+class QuantumMineralClassifier:
+    """PennyLane quantum kernel for mineral classification."""
 
-def _ensure_pennylane():
-    global _pennylane, _qml
-    if _pennylane is None:
+    def __init__(self, n_qubits: int = 4):
+        self.n_qubits = n_qubits
+        self._dev = None
+        self._kernel_fn = None
+
+    def _ensure_device(self):
+        if self._dev is not None:
+            return
         try:
             import pennylane as qml
-            _pennylane = True
-            _qml = qml
+            self._dev = qml.device("default.qubit", wires=self.n_qubits, shots=None)
+
+            @qml.qnode(self._dev)
+            def kernel(x1, x2):
+                qml.AngleEmbedding(x1[:self.n_qubits], wires=range(self.n_qubits))
+                qml.adjoint(qml.AngleEmbedding)(x2[:self.n_qubits], wires=range(self.n_qubits))
+                return qml.probs(wires=range(self.n_qubits))
+
+            self._kernel_fn = kernel
         except ImportError:
-            raise ImportError("PennyLane not installed. Using classical fallback.")
+            raise ImportError("PennyLane not installed")
 
-
-@dataclass
-class QMLResult:
-    """Result from quantum or classical ML classification."""
-    predictions: NDArray
-    probabilities: NDArray | None
-    backend_used: str
-    elapsed_seconds: float
-    accuracy: float | None
-    training_loss: list[float] | None = None
-    n_parameters: int | None = None
-
-
-class VariationalQuantumClassifier:
-    """Variational Quantum Classifier (VQC) for geological prediction.
-
-    Architecture:
-        1. Data encoding: classical features → quantum state rotations
-        2. Variational layers: parameterized rotation + entangling gates
-        3. Measurement: expectation values → class probabilities
-        4. Classical optimizer: updates quantum parameters to minimize loss
-
-    This is a hybrid quantum-classical model — the quantum circuit is the
-    "neural network" and classical optimizer does gradient descent.
-
-    Falls back to GradientBoosting when quantum unavailable.
-    """
-
-    def __init__(
+    def classify(
         self,
-        n_qubits: int = 4,
-        n_layers: int = 3,
-        learning_rate: float = 0.1,
-        n_epochs: int = 50,
-        config: QuantumConfig | None = None,
-    ):
-        self.n_qubits = n_qubits
-        self.n_layers = n_layers
-        self.learning_rate = learning_rate
-        self.n_epochs = n_epochs
-        self.config = config or DEFAULT_CONFIG
-        self._params: NDArray | None = None
-        self._trained = False
+        data_point: List[float],
+        reference_points: Dict[str, List[float]],
+    ) -> Dict[str, Any]:
+        """Classify a mineral using quantum kernel similarity."""
+        self._ensure_device()
+        import numpy as np
 
-    # ── Quantum circuit ───────────────────────────────────────────────────
+        padded = data_point[:self.n_qubits] + [0.0] * max(0, self.n_qubits - len(data_point))
+        similarities = {}
 
-    def _build_circuit(self):
-        """Build the variational quantum circuit."""
-        _ensure_pennylane()
-        qml = _qml
+        for label, ref in reference_points.items():
+            padded_ref = ref[:self.n_qubits] + [0.0] * max(0, self.n_qubits - len(ref))
+            kernel_val = self._kernel_fn(
+                np.array(padded, dtype=np.float64),
+                np.array(padded_ref, dtype=np.float64),
+            )
+            similarities[label] = float(kernel_val[0])
 
-        n_qubits = self.n_qubits
-        dev = qml.device("default.qubit", wires=n_qubits, shots=None)
+        total = sum(similarities.values())
+        probabilities = {k: v / total for k, v in similarities.items()} if total > 0 else {k: 1.0 / len(similarities) for k in similarities}
+        best_match = max(probabilities, key=probabilities.get)
 
-        @qml.qnode(dev, interface="numpy")
-        def circuit(features: NDArray, params: NDArray) -> float:
-            """Variational quantum circuit.
+        return {
+            "success": True,
+            "method": "pennylane_quantum_kernel",
+            "n_qubits": self.n_qubits,
+            "probabilities": {k: round(v, 4) for k, v in probabilities.items()},
+            "best_match": best_match,
+            "confidence": round(probabilities[best_match], 4),
+        }
 
-            Args:
-                features: Input features (n_features,).
-                params: Trainable parameters (n_layers, n_qubits, 3).
 
-            Returns:
-                Expectation value of PauliZ on first qubit (→ class probability).
-            """
-            wires = list(range(n_qubits))
+class QuantumDrillOptimizer:
+    """Qiskit QAOA for drill target optimization."""
 
-            # Data encoding layer
-            for i in range(n_qubits):
-                qml.RY(features[i % len(features)], wires=i)
-                qml.RZ(features[(i + 1) % len(features)], wires=i)
+    def __init__(self, max_qubits: int = 16):
+        self.max_qubits = max_qubits
 
-            # Variational layers
-            for layer in range(self.n_layers):
-                # Single-qubit rotations
-                for i in range(n_qubits):
-                    qml.RX(params[layer, i, 0], wires=i)
-                    qml.RY(params[layer, i, 1], wires=i)
-                    qml.RZ(params[layer, i, 2], wires=i)
-
-                # Entangling gates
-                for i in range(n_qubits - 1):
-                    qml.CNOT(wires=[i, i + 1])
-                if n_qubits > 1:
-                    qml.CNOT(wires=[n_qubits - 1, 0])  # circular
-
-            # Measure
-            return qml.expval(qml.PauliZ(0))
-
-        return circuit
-
-    # ── Training ──────────────────────────────────────────────────────────
-
-    def _train_quantum(
-        self, X_train: NDArray, y_train: NDArray
-    ) -> tuple[NDArray, list[float]]:
-        """Train the variational quantum circuit.
-
-        Uses parameter-shift rule for gradient computation (built into PennyLane).
-        Classical optimizer (Adam-like) updates parameters.
-        """
-        _ensure_pennylane()
-        qml = _qml
-
-        n_features = X_train.shape[1]
-
-        # Initialize parameters
-        rng = np.random.default_rng(42)
-        params = rng.uniform(0, 2 * np.pi, size=(self.n_layers, self.n_qubits, 3))
-
-        circuit = self._build_circuit()
-        optimizer = qml.AdamOptimizer(step_size=self.learning_rate)
-
-        # Normalize labels to {-1, 1} for PauliZ measurement
-        classes = np.unique(y_train)
-        y_mapped = np.where(y_train == classes[0], -1.0, 1.0)
-
-        loss_history = []
-
-        for epoch in range(self.n_epochs):
-            # Compute predictions for all training samples
-            total_loss = 0.0
-            for i in range(len(X_train)):
-                x = X_train[i]
-                # Pad features to n_qubits
-                x_padded = np.zeros(self.n_qubits)
-                x_padded[:min(len(x), self.n_qubits)] = x[:self.n_qubits]
-
-                prediction = circuit(x_padded, params)
-                loss = (prediction - y_mapped[i]) ** 2
-                total_loss += loss
-
-            avg_loss = total_loss / len(X_train)
-            loss_history.append(float(avg_loss))
-
-            # Update parameters using PennyLane optimizer
-            def cost_fn(p):
-                c = 0.0
-                for i in range(len(X_train)):
-                    x = X_train[i]
-                    x_padded = np.zeros(self.n_qubits)
-                    x_padded[:min(len(x), self.n_qubits)] = x[:self.n_qubits]
-                    pred = circuit(x_padded, p)
-                    c += (pred - y_mapped[i]) ** 2
-                return c / len(X_train)
-
-            params = optimizer.step(cost_fn, params)
-
-            if (epoch + 1) % 10 == 0:
-                logger.info(f"VQC epoch {epoch + 1}/{self.n_epochs}, loss={avg_loss:.4f}")
-
-        return params, loss_history
-
-    def _predict_quantum(self, X: NDArray, params: NDArray) -> tuple[NDArray, NDArray]:
-        """Predict using trained quantum circuit."""
-        circuit = self._build_circuit()
-
-        predictions = []
-        probabilities = []
-
-        for x in X:
-            x_padded = np.zeros(self.n_qubits)
-            x_padded[:min(len(x), self.n_qubits)] = x[:self.n_qubits]
-
-            exp_val = circuit(x_padded, params)
-            # Map expectation value to class probability
-            prob_class_1 = (1 + float(exp_val)) / 2
-            predictions.append(1 if prob_class_1 > 0.5 else 0)
-            probabilities.append([1 - prob_class_1, prob_class_1])
-
-        return np.array(predictions), np.array(probabilities)
-
-    # ── High-level API ────────────────────────────────────────────────────
-
-    def fit_predict(
+    def optimize(
         self,
-        X_train: NDArray,
-        y_train: NDArray,
-        X_test: NDArray,
-    ) -> QMLResult:
-        """Train and predict using quantum or classical ML.
+        cost_matrix: List[List[float]],
+        num_select: int,
+        p_layers: int = 2,
+    ) -> Dict[str, Any]:
+        """Run QAOA optimization for drill target selection."""
+        n_items = len(cost_matrix)
+        n_qubits = min(n_items, self.max_qubits)
 
-        Automatically selects backend based on config.
-        """
-        backend = self.config.select_backend(
-            problem_type="variational_classification",
-            problem_size=X_train.shape[0],
-            n_qubits_needed=self.n_qubits,
-        )
-
-        if backend == QuantumBackend.PENNYLANE:
-            return self._fit_predict_quantum(X_train, y_train, X_test)
-        else:
-            return self._fit_predict_classical(X_train, y_train, X_test)
-
-    def _fit_predict_quantum(
-        self, X_train: NDArray, y_train: NDArray, X_test: NDArray
-    ) -> QMLResult:
-        """Quantum variational classification."""
-        start = time.perf_counter()
         try:
-            # Train quantum circuit
-            params, loss_history = self._train_quantum(X_train, y_train)
-            self._params = params
-            self._trained = True
+            from qiskit import QuantumCircuit, transpile
+            from qiskit_aer import AerSimulator
 
-            # Predict
-            predictions, probabilities = self._predict_quantum(X_test, params)
+            qc = QuantumCircuit(n_qubits)
+            for i in range(n_qubits):
+                qc.h(i)
 
-            # Estimate accuracy via leave-one-out on small training sets
-            accuracy = None
-            if len(X_train) <= 50:
-                correct = 0
-                for i in range(len(X_train)):
-                    x_padded = np.zeros(self.n_qubits)
-                    x_padded[:min(X_train.shape[1], self.n_qubits)] = X_train[i][:self.n_qubits]
-                    circuit = self._build_circuit()
-                    exp_val = circuit(x_padded, params)
-                    pred_class = 1 if (1 + float(exp_val)) / 2 > 0.5 else 0
-                    if pred_class == y_train[i]:
-                        correct += 1
-                accuracy = correct / len(X_train)
+            for _ in range(p_layers):
+                for i in range(n_qubits):
+                    cost_i = cost_matrix[i][i] if i < len(cost_matrix) else 0
+                    qc.rz(2 * cost_i, i)
+                for i in range(min(n_qubits - 1, n_items - 1)):
+                    for j in range(i + 1, min(n_qubits, n_items)):
+                        if i < len(cost_matrix) and j < len(cost_matrix[i]):
+                            coupling = cost_matrix[i][j]
+                            if abs(coupling) > 1e-6:
+                                qc.cx(i, j)
+                                qc.rz(2 * coupling, j)
+                                qc.cx(i, j)
+                for i in range(n_qubits):
+                    qc.rx(np.pi / 4, i)
 
-            elapsed = time.perf_counter() - start
-            self.config.record_benchmark(
-                "variational_classification", QuantumBackend.PENNYLANE, elapsed, accuracy
-            )
+            qc.measure_all()
+            simulator = AerSimulator()
+            compiled = transpile(qc, simulator)
+            result = simulator.run(compiled, shots=2048).result()
+            counts = result.get_counts()
 
-            return QMLResult(
-                predictions=predictions,
-                probabilities=probabilities,
-                backend_used="pennylane_vqc",
-                elapsed_seconds=elapsed,
-                accuracy=accuracy,
-                training_loss=loss_history,
-                n_parameters=int(np.prod(params.shape)),
-            )
+            best_solution, best_score = None, -float('inf')
+            for bitstring, count in counts.items():
+                if bitstring.count("1") == num_select:
+                    score = sum(cost_matrix[i][i] for i, b in enumerate(reversed(bitstring)) if b == "1" and i < len(cost_matrix))
+                    if score > best_score:
+                        best_score = score
+                        best_solution = bitstring
 
+            if best_solution:
+                selected = [i for i, b in enumerate(reversed(best_solution)) if b == "1"]
+            else:
+                scores = sorted(enumerate(range(min(n_items, n_qubits))), key=lambda x: cost_matrix[x[1]][x[1]], reverse=True)
+                selected = [s[1] for s in scores[:num_select]]
+
+            return {
+                "success": True, "method": "qiskit_qaoa", "n_qubits": n_qubits,
+                "p_layers": p_layers, "selected_indices": selected,
+                "total_score": round(best_score, 4), "shots": 2048,
+            }
+        except ImportError:
+            return {"success": False, "error": "Qiskit not installed", "fallback": "Use greedy_optimization"}
         except Exception as e:
-            logger.warning(f"Quantum VQC failed: {e}. Falling back to classical.")
-            return self._fit_predict_classical(X_train, y_train, X_test)
-
-    def _fit_predict_classical(
-        self, X_train: NDArray, y_train: NDArray, X_test: NDArray
-    ) -> QMLResult:
-        """Classical variational classifier fallback."""
-        result = ClassicalFallback.variational_classifier(X_train, y_train, X_test)
-        self.config.record_benchmark(
-            "variational_classification", QuantumBackend.CLASSICAL,
-            result.elapsed_seconds, result.accuracy,
-        )
-
-        return QMLResult(
-            predictions=result.result,
-            probabilities=None,
-            backend_used=f"classical_{result.method}",
-            elapsed_seconds=result.elapsed_seconds,
-            accuracy=result.accuracy,
-        )
-
-    # ── Utility ───────────────────────────────────────────────────────────
-
-    def save_params(self, path: str) -> None:
-        """Save trained quantum parameters."""
-        if self._params is not None:
-            np.save(path, self._params)
-            logger.info(f"Saved VQC parameters to {path}")
-
-    def load_params(self, path: str) -> None:
-        """Load trained quantum parameters."""
-        self._params = np.load(path)
-        self._trained = True
-        logger.info(f"Loaded VQC parameters from {path}")
-
-
-class QuantumNeuralNetwork:
-    """Quantum Neural Network for geological pattern recognition.
-
-    A deeper variational circuit that acts like a quantum neural network,
-    with multiple layers of parameterized gates acting as "neurons."
-    Used for complex geological predictions where simple VQC isn't enough.
-    """
-
-    def __init__(
-        self,
-        n_qubits: int = 6,
-        n_layers: int = 5,
-        config: QuantumConfig | None = None,
-    ):
-        self.n_qubits = n_qubits
-        self.n_layers = n_layers
-        self.config = config or DEFAULT_CONFIG
-
-    def predict(
-        self, X_train: NDArray, y_train: NDArray, X_test: NDArray
-    ) -> QMLResult:
-        """Run QNN prediction — delegates to VQC with more layers."""
-        vqc = VariationalQuantumClassifier(
-            n_qubits=self.n_qubits,
-            n_layers=self.n_layers,
-            config=self.config,
-        )
-        return vqc.fit_predict(X_train, y_train, X_test)
+            return {"success": False, "error": str(e)}

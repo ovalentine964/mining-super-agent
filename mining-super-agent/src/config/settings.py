@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     # ── API Key Encryption ──────────────────────────────────────
     api_keys_encryption_key: SecretStr = Field(default=SecretStr(""))
 
+    # ── Database Column Encryption ────────────────────────────────
+    encryption_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Fernet key for database column encryption. Comma-separated for key rotation.",
+    )
+
+    # ── MFA ─────────────────────────────────────────────────────
+    mfa_issuer_name: str = Field(
+        default="Mining Super-Agent",
+        description="Issuer name shown in authenticator apps.",
+    )
+
     # ── PostgreSQL ──────────────────────────────────────────────
     postgres_db: str = Field(default="mining")
     postgres_user: str = Field(default="mining")
@@ -200,9 +212,28 @@ class Settings(BaseSettings):
                     "Generate: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
                 )
 
+            # ENCRYPTION_KEY is always required (not just production)
+            db_enc_key = self.encryption_key.get_secret_value()
+            if not db_enc_key or db_enc_key.startswith("CHANGE_ME"):
+                errors.append(
+                    "ENCRYPTION_KEY is not set or uses placeholder. "
+                    "The app CANNOT start without database encryption. "
+                    "Generate: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+                )
+
             redis_pw = self.redis_password.get_secret_value()
             if not redis_pw or redis_pw.startswith("CHANGE_ME"):
                 errors.append("REDIS_PASSWORD is not set or uses placeholder.")
+
+        # ENCRYPTION_KEY is required in ALL environments
+        db_enc_key = self.encryption_key.get_secret_value()
+        if not db_enc_key or db_enc_key.startswith("CHANGE_ME"):
+            if "ENCRYPTION_KEY is not set" not in str(errors):
+                errors.append(
+                    "ENCRYPTION_KEY is not set or uses placeholder. "
+                    "The app CANNOT start without database encryption. "
+                    "Generate: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+                )
 
         if errors:
             print("\n🚨 CRITICAL CONFIGURATION ERRORS — REFUSING TO START:\n")

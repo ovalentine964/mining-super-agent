@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Locale provider for language switching.
 class LocaleProvider extends ChangeNotifier {
-  Locale _locale = const Locale('sw');
+  Locale _locale = const Locale('sw'); // Default to Swahili
 
   Locale get locale => _locale;
 

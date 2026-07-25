@@ -156,3 +156,21 @@ def _format_legal_swahili(sections: list[dict]) -> str:
     for section in sections:
         summaries.append(f"• {section['summary']}")
     return "\n".join(summaries)
+
+
+def register_legal_tools(registry) -> None:
+    """Register all legal tools with the tool registry."""
+    from .schemas import MiningActInput, MiningActOutput, LicensingInput, LicensingOutput
+
+    registry.register_handler(
+        "query_mining_act",
+        query_mining_act,
+        input_schema=MiningActInput,
+        output_schema=MiningActOutput,
+    )
+    registry.register_handler(
+        "licensing_info",
+        get_licensing_info,
+        input_schema=LicensingInput,
+        output_schema=LicensingOutput,
+    )

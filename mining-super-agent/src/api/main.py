@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config.settings import get_settings
 from src.db.database import close_db, init_db
+from src.db.encryption import validate_encryption_key
 
 logger = logging.getLogger("mining.api")
 settings = get_settings()
@@ -106,6 +107,13 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     # Startup
     logger.info("Starting Mining Super-Agent API (env=%s)", settings.app_env.value)
+
+    # Validate encryption key before accepting traffic
+    if not validate_encryption_key():
+        logger.critical("Encryption key validation FAILED — refusing to start")
+        raise RuntimeError("Encryption key validation failed")
+    logger.info("Encryption key validated")
+
     await init_db()
     logger.info("Database initialized")
 
@@ -147,10 +155,18 @@ app.add_middleware(
     max_age=600,  # Cache preflight for 10 minutes
 )
 
-# 2. Error handling
+# 2. Security headers (OWASP recommended)
+from src.api.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. TLS enforcement (defense-in-depth, rejects plain HTTP in production)
+from src.api.middleware.tls_enforcement import TLSEnforcementMiddleware  # noqa: E402
+app.add_middleware(TLSEnforcementMiddleware)
+
+# 4. Error handling
 app.add_middleware(ErrorHandlingMiddleware)
 
-# 3. Request logging (outermost = runs first)
+# 5. Request logging (outermost = runs first)
 app.add_middleware(RequestLoggingMiddleware)
 
 

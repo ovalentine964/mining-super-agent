@@ -1,1 +1,1 @@
-# Training module
+"""ML training utilities."""

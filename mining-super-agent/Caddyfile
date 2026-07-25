@@ -1,9 +1,10 @@
 # Mining Super-Agent — Caddy Reverse Proxy
-# Auto-TLS with Let's Encrypt, HSTS, rate limiting
+# Auto-TLS with Let's Encrypt, HSTS, rate limiting, security headers
 
 {$DOMAIN:localhost} {
     # ── TLS ─────────────────────────────────────────────────────
     tls {$ACME_EMAIL:admin@example.com}
+    # HTTP → HTTPS redirect is automatic in Caddy when TLS is configured
     # HSTS header (2 years, include subdomains, preload-ready)
     header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 
@@ -13,7 +14,12 @@
     header X-XSS-Protection "1; mode=block"
     header Referrer-Policy "strict-origin-when-cross-origin"
     header Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    header Cross-Origin-Embedder-Policy "require-corp"
+    header Cross-Origin-Opener-Policy "same-origin"
+    header Cross-Origin-Resource-Policy "same-origin"
     header -Server
+    header -X-Powered-By
 
     # ── Rate Limiting ───────────────────────────────────────────
     # Global: 100 requests/second burst

@@ -1,0 +1,128 @@
+# Tool Registry Configuration
+# Each tool maps to a backend Python service endpoint
+
+tools:
+  # ── Geological Analysis ────────────────────────────────────────
+  - name: geological_analysis
+    description: "Analyze geological survey data for mineral deposits"
+    service_type: geological
+    endpoint: /analyze
+    method: POST
+    rate_limit: 30
+    cache_ttl_secs: 300
+    timeout_secs: 120
+    enabled: true
+
+  - name: rock_classification
+    description: "Classify rock types from geological samples"
+    service_type: geological
+    endpoint: /classify
+    method: POST
+    rate_limit: 50
+    cache_ttl_secs: 600
+    timeout_secs: 60
+    enabled: true
+
+  - name: mineral_prediction
+    description: "Predict mineral deposits based on geological features"
+    service_type: geological
+    endpoint: /predict
+    method: POST
+    rate_limit: 20
+    cache_ttl_secs: 300
+    timeout_secs: 180
+    enabled: true
+
+  # ── Satellite Processing ────────────────────────────────────────
+  - name: ndvi_analysis
+    description: "Calculate NDVI from satellite imagery"
+    service_type: satellite
+    endpoint: /ndvi
+    method: POST
+    rate_limit: 20
+    cache_ttl_secs: 600
+    timeout_secs: 300
+    enabled: true
+
+  - name: change_detection
+    description: "Detect land changes from multi-temporal satellite imagery"
+    service_type: satellite
+    endpoint: /change-detection
+    method: POST
+    rate_limit: 10
+    cache_ttl_secs: 900
+    timeout_secs: 300
+    enabled: true
+
+  - name: mineral_mapping
+    description: "Map mineral distribution from hyperspectral satellite data"
+    service_type: satellite
+    endpoint: /mineral-mapping
+    method: POST
+    rate_limit: 10
+    cache_ttl_secs: 900
+    timeout_secs: 300
+    enabled: true
+
+  # ── Market Data ─────────────────────────────────────────────────
+  - name: commodity_price
+    description: "Get real-time commodity prices (gold, copper, lithium, etc.)"
+    service_type: market
+    endpoint: /finnhub/quote
+    method: GET
+    rate_limit: 100
+    cache_ttl_secs: 30
+    timeout_secs: 10
+    enabled: true
+
+  - name: market_forecast
+    description: "Generate AI-powered commodity price forecasts"
+    service_type: market
+    endpoint: /market/forecast
+    method: POST
+    rate_limit: 20
+    cache_ttl_secs: 600
+    timeout_secs: 120
+    enabled: true
+
+  # ── Vision / ML ─────────────────────────────────────────────────
+  - name: geological_imagery_analysis
+    description: "Analyze geological imagery using computer vision"
+    service_type: vision
+    endpoint: /analyze
+    method: POST
+    rate_limit: 30
+    cache_ttl_secs: 300
+    timeout_secs: 120
+    enabled: true
+
+  - name: equipment_inspection
+    description: "Inspect mining equipment from drone/surveillance imagery"
+    service_type: vision
+    endpoint: /inspect
+    method: POST
+    rate_limit: 30
+    cache_ttl_secs: 300
+    timeout_secs: 120
+    enabled: true
+
+  # ── Quantum Optimization ────────────────────────────────────────
+  - name: portfolio_optimization
+    description: "Optimize mining investment portfolio using quantum algorithms"
+    service_type: quantum
+    endpoint: /optimize
+    method: POST
+    rate_limit: 5
+    cache_ttl_secs: 1800
+    timeout_secs: 600
+    enabled: true
+
+  - name: logistics_optimization
+    description: "Optimize mining logistics and supply chain routing"
+    service_type: quantum
+    endpoint: /optimize
+    method: POST
+    rate_limit: 5
+    cache_ttl_secs: 1800
+    timeout_secs: 600
+    enabled: true
