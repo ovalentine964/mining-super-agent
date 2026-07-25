@@ -1,0 +1,54 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.apk
+*.aab
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+.tmp/
+tmp/
+.openclaw/tmp/
+
+# Sensitive
+*.pem
+*.key
+*.cert
+tokens.json
