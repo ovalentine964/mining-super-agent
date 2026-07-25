@@ -929,3 +929,14 @@ TOTAL: 28 reports, ~1.5MB of research and architecture
 **This is the FINAL ARCHITECTURE. Council-approved. All 26 issues resolved. Ready for engineering.**
 
 *Compiled by Chief Architect — 2026-07-25*
+
+### 7.9 Future: GPU Quantum (When Accessible)
+
+| Platform | Requires | When Available | What It Unlocks |
+|----------|----------|---------------|------------------|
+| **CUDA-Q** | NVIDIA GPU (DGX Spark) | When Valentine gets hardware | 100x faster quantum simulation, 30+ qubits |
+| **cuQuantum** | NVIDIA GPU | When Valentine gets hardware | Large-scale geological simulation |
+| **D-Wave Leap** | Cloud (free tier improves) | Year 2-3 | Real quantum annealing for optimization |
+| **IBM Quantum** | Cloud (free tier improves) | Year 2-3 | Real quantum hardware for VQE |
+
+**When these become accessible, they activate automatically via the Tool Registry. No code changes needed — just flip the switch.**
