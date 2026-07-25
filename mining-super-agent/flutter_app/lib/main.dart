@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'services/app_localizations.dart';
 import 'services/locale_provider.dart';
-import 'package:provider/provider.dart';
+import 'services/offline_sync.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Start offline sync service
+  OfflineSyncService.instance.start();
+
   runApp(
     MultiProvider(
       providers: [
@@ -32,10 +39,12 @@ class MiningApp extends StatelessWidget {
         useMaterial3: true,
       ),
       locale: localeProvider.locale,
-      supportedLocales: const [
-        Locale('en'), // English
-        Locale('sw'), // Swahili
-        Locale('luo'), // Luo
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       home: const HomeScreen(),
     );
