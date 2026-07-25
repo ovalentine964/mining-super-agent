@@ -108,15 +108,17 @@ async fn execute_tool(
         }
     };
 
+    // Compute deterministic cache key (used for both read and write)
+    let cache_key = format!("cache:tool:{}:{}", tool_name, {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        body.to_string().hash(&mut h);
+        h.finish()
+    });
+
     // Check cache first
-    if let Some(ttl) = tool_config.cache_ttl_secs {
-        let cache_key = format!("cache:tool:{}:{}", tool_name, {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut h = DefaultHasher::new();
-            body.to_string().hash(&mut h);
-            h.finish()
-        });
+    if let Some(_ttl) = tool_config.cache_ttl_secs {
         let cached: Result<Option<String>, _> = redis::cmd("GET")
             .arg(&cache_key)
             .query_async(&mut conn)
@@ -169,7 +171,7 @@ async fn execute_tool(
         Ok(value) => {
             // Cache the result if TTL is configured
             if let Some(ttl) = tool_config.cache_ttl_secs {
-                let cache_key = format!("cache:tool:{}:{}", tool_name, uuid::Uuid::new_v4());
+                // Reuse the same deterministic cache_key computed above
                 let _: () = redis::cmd("SETEX")
                     .arg(&cache_key)
                     .arg(ttl)

@@ -28,7 +28,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
-    phone: Mapped[Optional[str]] = mapped_column(String(30))
+    phone: Mapped[Optional[str]] = mapped_column(EncryptedString(255))
     preferred_language: Mapped[str] = mapped_column(String(10), default="en")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -108,6 +108,21 @@ class Observation(Base):
 
     user: Mapped["User"] = relationship(back_populates="observations")
     mineral_occurrence: Mapped[Optional[MineralOccurrence]] = relationship(back_populates="observations")
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    permissions: Mapped[Optional[dict]] = mapped_column(JSONB)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revoked: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+    user: Mapped["User"] = relationship(lazy="selectin")
 
 
 class RockType(Base):

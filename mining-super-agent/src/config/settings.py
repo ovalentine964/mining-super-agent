@@ -143,6 +143,11 @@ class Settings(BaseSettings):
         return origins
 
     @property
+    def cors_enabled(self) -> bool:
+        """Whether CORS is configured. Empty CORS_ORIGINS = no CORS (deny all)."""
+        return bool(self.cors_origin_list)
+
+    @property
     def async_database_url(self) -> str:
         """Get async database URL (postgresql+asyncpg)."""
         if self.database_url:

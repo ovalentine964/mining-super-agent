@@ -121,7 +121,18 @@ class MineralClassifier:
 
         if best_idx == GOLD_IDX:
             pyrite_prob = float(probs[PYRITE_IDX])
-            if pyrite_prob > 0.1:
+            # HARD BLOCK: If pyrite probability > 0.3, NEVER return gold
+            if pyrite_prob > 0.3:
+                best_class = "pyrite"
+                best_idx = PYRITE_IDX
+                capped_confidence = min(capped_confidence, 0.40)
+                look_alike_warning = (
+                    f"BLOCKED: High pyrite probability ({pyrite_prob:.1%}). "
+                    f"Reclassified as pyrite. Gold probability was {best_confidence:.1%}. "
+                    f"Physical testing (streak, hardness, XRF) is MANDATORY."
+                )
+                disclaimers.append(look_alike_warning)
+            elif pyrite_prob > 0.1:
                 look_alike_warning = (
                     f"CAUTION: This may be gold OR pyrite. "
                     f"Gold: {best_confidence:.1%}, Pyrite: {pyrite_prob:.1%}. "

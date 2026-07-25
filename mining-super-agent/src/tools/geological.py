@@ -294,10 +294,116 @@ async def geological_database_query(
     }
 
 
+async def analyze_deposit_model(
+    observations: dict[str, Any],
+    location: dict[str, float] | None = None,
+    mineral_type: str | None = None,
+) -> dict[str, Any]:
+    """
+    Match observations to known deposit models.
+
+    Compares field observations (rock type, alteration, mineralization,
+    structural setting) against a database of known deposit types to
+    identify the most likely deposit model.
+
+    Args:
+        observations: Dict with keys like rock_type, alteration, minerals,
+                      structures, host_rock, etc.
+        location: Optional lat/lon for context.
+        mineral_type: Optional hint about target mineral.
+    """
+    # Known deposit model templates
+    DEPOSIT_MODELS = {
+        "orogenic_gold": {
+            "name": "Orogenic Gold",
+            "key_indicators": [
+                "quartz_veins", "shear_zones", "arsenopyrite",
+                "pyrite", "sericite_alteration", "carbonate_alteration",
+            ],
+            "host_rocks": ["greenstone", "metavolcanics", "metasediments", "banded_iron_formation"],
+            "typical_grades": "1-15 g/t Au",
+            "tectonic_setting": "Convergent margin, Archean greenstone belts",
+            "examples": ["Migori Greenstone Belt", "Witwatersrand", "Kalgoorlie"],
+        },
+        "volcanogenic_massive_sulfide": {
+            "name": "Volcanogenic Massive Sulfide (VMS)",
+            "key_indicators": [
+                "massive_sulfide", "chalcopyrite", "sphalerite",
+                "galena", "stockwork_veining", "chlorite_alteration",
+            ],
+            "host_rocks": ["felsic_volcanics", "bimodal_volcanics", "black_shale"],
+            "typical_grades": "1-5% Cu, 1-10% Zn",
+            "tectonic_setting": "Back-arc basin, mid-ocean ridge",
+            "examples": ["Kisumu Belt", "Iberian Pyrite Belt"],
+        },
+        "skarn": {
+            "name": "Skarn Deposit",
+            "key_indicators": [
+                "garnet", "pyroxene", "calcite",
+                "magnetite", "chalcopyrite", "limestone_contact",
+            ],
+            "host_rocks": ["limestone", "dolomite", "granite_intrusion"],
+            "typical_grades": "0.5-3% Cu or variable",
+            "tectonic_setting": "Intrusion-related, contact metamorphism",
+            "examples": [],
+        },
+        "placer": {
+            "name": "Placer Deposit",
+            "key_indicators": [
+                "alluvial_gravel", "heavy_minerals", "rounded_clasts",
+                "stream_sediment_gold", "black_sand",
+            ],
+            "host_rocks": ["alluvium", "terrace_gravel", "river_sediment"],
+            "typical_grades": "0.1-5 g/m³ Au",
+            "tectonic_setting": "Secondary enrichment in drainage basins",
+            "examples": ["Migori alluvial", "Sierra Leone placers"],
+        },
+    }
+
+    # Score each deposit model against observations
+    obs_text = " ".join(str(v) for v in observations.values()).lower()
+    obs_keys = set(k.lower() for k in observations.keys())
+
+    scored_models = []
+    for model_key, model in DEPOSIT_MODELS.items():
+        score = 0
+        matched_indicators = []
+        for indicator in model["key_indicators"]:
+            if indicator in obs_text or indicator.replace("_", " ") in obs_text:
+                score += 2
+                matched_indicators.append(indicator)
+        for host in model["host_rocks"]:
+            if host in obs_text or host.replace("_", " ") in obs_text:
+                score += 1
+        if mineral_type and mineral_type.lower() in model["name"].lower():
+            score += 3
+
+        if score > 0:
+            scored_models.append({
+                "model": model["name"],
+                "confidence": min(round(score / 10, 2), 0.95),
+                "matched_indicators": matched_indicators,
+                "typical_grades": model["typical_grades"],
+                "tectonic_setting": model["tectonic_setting"],
+                "examples": model["examples"],
+            })
+
+    scored_models.sort(key=lambda x: x["confidence"], reverse=True)
+
+    return {
+        "success": True,
+        "observations_used": list(observations.keys()),
+        "matched_models": scored_models[:5],
+        "best_match": scored_models[0] if scored_models else None,
+        "note": "Deposit model matching based on field observations. Geological survey recommended for confirmation.",
+    }
+
+
 def register_geological_tools(registry) -> None:
     """Register all geological tools with the tool registry."""
     registry.register_handler("gempy_3d_model", gempy_3d_model)
-    registry.register_handler("simpeg_inversion", simpeg_inversion)
-    registry.register_handler("mindat_query", mindat_query)
+    registry.register_handler("run_geophysical_inversion", simpeg_inversion)
+    registry.register_handler("query_mindat", mindat_query)
     registry.register_handler("usgs_mrdata_query", usgs_mrdata_query)
-    registry.register_handler("geological_database_query", geological_database_query)
+    registry.register_handler("query_geological_database", geological_database_query)
+    registry.register_handler("analyze_deposit_model", analyze_deposit_model)

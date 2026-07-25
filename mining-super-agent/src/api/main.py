@@ -137,23 +137,27 @@ app = FastAPI(
 )
 
 # ── Middleware (order matters: last added = first executed) ──────
-# 1. CORS — must be first for preflight requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-        "X-Request-ID",
-        "Accept",
-        "Origin",
-        "User-Agent",
-    ],
-    expose_headers=["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
-    max_age=600,  # Cache preflight for 10 minutes
-)
+# 1. CORS — must be first for preflight requests.
+#    Only add middleware when origins are configured; empty CORS_ORIGINS = no CORS.
+if settings.cors_enabled:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "Accept",
+            "Origin",
+            "User-Agent",
+        ],
+        expose_headers=["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+        max_age=600,  # Cache preflight for 10 minutes
+    )
+else:
+    logger.info("CORS disabled — no allowed origins configured")
 
 # 2. Security headers (OWASP recommended)
 from src.api.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402

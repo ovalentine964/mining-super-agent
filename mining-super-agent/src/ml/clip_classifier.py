@@ -102,9 +102,21 @@ class CLIPMineralClassifier:
         top_3 = [(MINERAL_CLASSES[i], float(probs[i])) for i in top_indices[:3]]
         best_class = MINERAL_CLASSES[top_indices[0]]
         capped_confidence = min(float(probs[top_indices[0]]), IMAGE_ONLY_MAX_CONFIDENCE)
+        disclaimers = [DISCLAIMER_SWAHILI]
+
+        # HARD BLOCK: If pyrite is in top-3 and prediction is gold, reclassify as pyrite
+        top_3_classes = [m for m, _ in top_3]
+        if "pyrite" in top_3_classes and best_class == "gold":
+            pyrite_score = all_scores.get("pyrite", 0.0)
+            best_class = "pyrite"
+            capped_confidence = min(capped_confidence, 0.40)
+            disclaimers.append(
+                f"BLOCKED: Pyrite detected in top-3 (score: {pyrite_score:.4f}). "
+                f"Reclassified as pyrite. Physical testing MANDATORY."
+            )
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         return CLIPPrediction(
             mineral=best_class, confidence=capped_confidence, top_3=top_3,
-            all_scores=all_scores, disclaimers=[DISCLAIMER_SWAHILI], inference_time_ms=elapsed_ms,
+            all_scores=all_scores, disclaimers=disclaimers, inference_time_ms=elapsed_ms,
         )
