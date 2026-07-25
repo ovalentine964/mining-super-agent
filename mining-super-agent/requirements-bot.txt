@@ -1,0 +1,19 @@
+# Mining Super-Agent Telegram Bot — Dependencies
+
+# Telegram bot framework (v21+)
+python-telegram-bot>=21.0
+
+# Voice transcription
+openai-whisper>=20231117
+
+# PDF parsing
+pdfplumber>=0.10.0
+
+# HTTP client (for agent API calls)
+httpx>=0.27.0
+
+# Structured data
+pydantic>=2.0
+
+# Async utilities
+anyio>=4.0

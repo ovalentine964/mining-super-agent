@@ -1,0 +1,112 @@
+# Mining Super-Agent — Caddy Reverse Proxy
+# Auto-TLS with Let's Encrypt, HSTS, rate limiting
+
+{$DOMAIN:localhost} {
+    # ── TLS ─────────────────────────────────────────────────────
+    tls {$ACME_EMAIL:admin@example.com}
+    # HSTS header (2 years, include subdomains, preload-ready)
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+    # ── Security Headers ────────────────────────────────────────
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header X-XSS-Protection "1; mode=block"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+    header Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    header -Server
+
+    # ── Rate Limiting ───────────────────────────────────────────
+    # Global: 100 requests/second burst
+    rate_limit {
+        zone global {
+            key {remote_host}
+            events 100
+            window 1s
+        }
+    }
+
+    # API endpoints: stricter rate limit
+    rate_limit {
+        zone api {
+            key {remote_host}
+            events 30
+            window 1s
+        }
+    }
+
+    # Auth endpoints: very strict
+    rate_limit {
+        zone auth {
+            key {remote_host}
+            events 5
+            window 1s
+        }
+    }
+
+    # ── Request Size Limits ─────────────────────────────────────
+    request_body {
+        max_size 10MB
+    }
+
+    # ── Logging ─────────────────────────────────────────────────
+    log {
+        output file /data/access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+
+    # ── Routes ──────────────────────────────────────────────────
+    # Auth endpoints (strict rate limiting)
+    handle /api/v1/auth/* {
+        rate_limit zone auth
+        reverse_proxy app:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+            }
+        }
+    }
+
+    # API endpoints
+    handle /api/* {
+        rate_limit zone api
+        reverse_proxy app:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            transport http {
+                read_timeout 60s
+                write_timeout 60s
+            }
+        }
+    }
+
+    # Health check (no rate limit, for monitoring)
+    handle /health* {
+        reverse_proxy app:8000 {
+            transport http {
+                read_timeout 5s
+            }
+        }
+    }
+
+    # Default: catch-all
+    handle {
+        reverse_proxy app:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # ── Error Pages ─────────────────────────────────────────────
+    handle_errors {
+        respond "{err.status_code} {err.status_text}" {err.status_code}
+    }
+}

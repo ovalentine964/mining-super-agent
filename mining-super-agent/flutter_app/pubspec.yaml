@@ -1,0 +1,84 @@
+name: mining_super_agent
+description: Mining Super-Agent Flutter App - AI-powered mining analysis for Kenyan miners
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Core
+  cupertino_icons: ^1.0.8
+  intl: ^0.19.0
+
+  # GPS & Location
+  geolocator: ^13.0.1
+  geocoding: ^3.0.0
+
+  # Camera & Images
+  camera: ^0.11.0+2
+  image_picker: ^1.1.2
+
+  # Database (Offline-First)
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.5
+
+  # Networking
+  http: ^1.2.2
+  connectivity_plus: ^6.1.1
+
+  # State Management
+  provider: ^6.1.2
+
+  # UI
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+
+  # Utils
+  uuid: ^4.5.1
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.1
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.3.4
+  flutter_secure_storage: ^9.2.4
+
+  # PDF viewing
+  syncfusion_flutter_pdfviewer: ^28.1.4
+
+  # Charts
+  fl_chart: ^0.69.2
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.14
+  json_serializable: ^6.9.2
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  generate: true
+
+  fonts:
+    - family: NotoSans
+      fonts:
+        - asset: assets/fonts/NotoSans-Regular.ttf
+        - asset: assets/fonts/NotoSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NotoSans-SemiBold.ttf
+          weight: 600

@@ -1,0 +1,205 @@
+# Mining Super-Agent — Production Docker Compose
+# Oracle Cloud Free Tier: 4 ARM cores, 24GB RAM total
+# All databases on internal network only (no port mapping)
+
+version: "3.8"
+
+services:
+  # ─── PostgreSQL + PostGIS ─────────────────────────────────────
+  postgres:
+    image: postgis/postgis:15-3.4
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mining}
+      POSTGRES_USER: ${POSTGRES_USER:-mining}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mining} -d ${POSTGRES_DB:-mining}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # NO port mapping — internal network only
+
+  # ─── Redis (cache + sessions + rate limiting) ────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      --rename-command FLUSHALL ""
+      --rename-command FLUSHDB ""
+      --rename-command CONFIG ""
+      --rename-command DEBUG ""
+      --rename-command SHUTDOWN ""
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # NO port mapping — internal network only
+
+  # ─── Qdrant (vector database for embeddings) ─────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__HTTP_PORT: 6333
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-compatible object storage) ────────────────────
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ─── FastAPI Application ─────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - internal
+      - external
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mining}:${DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-mining}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-mining}:${DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-mining}
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      # Qdrant
+      QDRANT_URL: http://qdrant:6333
+      # MinIO
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_SECURE: "false"
+      # App
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:?JWT_REFRESH_SECRET_KEY must be set}
+      API_KEYS_ENCRYPTION_KEY: ${API_KEYS_ENCRYPTION_KEY:?API_KEYS_ENCRYPTION_KEY must be set}
+      # External APIs
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  # ─── Caddy (reverse proxy, auto-TLS, HSTS) ──────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    networks:
+      - external
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    depends_on:
+      - app
+
+networks:
+  internal:
+    internal: true  # No external access
+  external:         # Caddy and app can reach the internet
+
+volumes:
+  pgdata:
+  redis_data:
+  qdrant_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
