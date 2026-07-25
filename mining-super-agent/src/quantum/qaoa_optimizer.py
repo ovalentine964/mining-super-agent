@@ -117,6 +117,23 @@ class QAOAOptimizer:
         selected = [i for i, bit in enumerate(bitstring) if bit == 1]
         return OptimizationResult(selected_targets=selected, total_value=-result.result["energy"], energy=result.result["energy"], backend_used=f"classical_{result.method}", elapsed_seconds=result.elapsed_seconds)
 
+    @staticmethod
+    def generate_random_problem(n_sites: int, n_select: int | None = None, seed: int = 42):
+        """Generate a random drill-target optimization problem for benchmarking."""
+        rng = np.random.default_rng(seed)
+        if n_select is None:
+            n_select = max(1, n_sites // 4)
+        site_values = rng.uniform(10, 100, size=n_sites)
+        coords = rng.uniform(0, 1000, size=(n_sites, 2))
+        dist_matrix = np.zeros((n_sites, n_sites))
+        for i in range(n_sites):
+            for j in range(i + 1, n_sites):
+                d = float(np.linalg.norm(coords[i] - coords[j]))
+                dist_matrix[i, j] = d
+                dist_matrix[j, i] = d
+        costs = rng.uniform(5, 30, size=n_sites)
+        return site_values, dist_matrix, costs
+
     def optimize_drill_targets(self, site_values, distance_matrix, cost_per_site, n_select, penalty_weight=10.0) -> OptimizationResult:
         Q = self.build_qubo_matrix(site_values, distance_matrix, cost_per_site, n_select, penalty_weight)
         n_qubits = len(site_values)

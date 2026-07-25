@@ -59,7 +59,12 @@ async fn main() -> std::io::Result<()> {
     });
 
     HttpServer::new(move || {
-        let cors = if state.config.cors_origins.contains(&"*".to_string()) {
+        let cors = if state.config.cors_origins.is_empty() {
+            // No CORS origins configured — reject all cross-origin requests
+            Cors::default()
+        } else if state.config.cors_origins.contains(&"*".to_string()) {
+            // Wildcard — allowed only in non-production (validated in config)
+            tracing::warn!("CORS is set to wildcard '*' — this should NOT be used in production");
             Cors::default()
                 .allow_any_origin()
                 .allow_any_method()

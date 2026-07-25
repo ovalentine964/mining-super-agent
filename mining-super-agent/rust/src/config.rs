@@ -70,8 +70,18 @@ impl AppConfig {
             anyhow::bail!("JWT_SECRET must be at least 32 characters");
         }
 
-        let cors_origins = env::var("CORS_ORIGINS")
-            .unwrap_or_else(|_| "*".to_string())
+        let cors_raw = env::var("CORS_ORIGINS").unwrap_or_default();
+
+        // Validate: refuse to start in production with wildcard "*"
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        if cors_raw.trim() == "*" && app_env == "production" {
+            anyhow::bail!(
+                "CORS_ORIGINS must not be '*' in production. \
+                 Set explicit allowed origins (e.g. CORS_ORIGINS=https://yourdomain.com)"
+            );
+        }
+
+        let cors_origins: Vec<String> = cors_raw
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
@@ -127,10 +137,17 @@ impl AppConfig {
             self.port = port as u16;
         }
         if let Some(origins) = yaml_config.get("cors_origins").and_then(|v| v.as_sequence()) {
-            self.cors_origins = origins
+            let app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+            let origins_vec: Vec<String> = origins
                 .iter()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect();
+            if origins_vec.contains(&"*".to_string()) && app_env == "production" {
+                anyhow::bail!(
+                    "cors_origins must not contain '*' in production"
+                );
+            }
+            self.cors_origins = origins_vec;
         }
         Ok(self)
     }

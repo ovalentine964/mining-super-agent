@@ -83,8 +83,8 @@ class MiningDeerFlowAgent:
         self._ensure_config()
 
         try:
-            from deerflow.config.app_config import load_app_config
-            self._app_config = load_app_config()
+            from deerflow.config.app_config import reload_app_config
+            self._app_config = reload_app_config()
             logger.info("DeerFlow config loaded from %s", self.config_path)
             return self._app_config
         except ImportError as e:
@@ -115,14 +115,18 @@ class MiningDeerFlowAgent:
         config = self._load_config()
 
         try:
-            from deerflow.agents import create_agent
-            from deerflow.tools import get_available_tools
+            from deerflow.agents.factory import create_deerflow_agent
+            from deerflow.tools.tools import get_available_tools
+            from langchain.chat_models import init_chat_model
+
+            # Resolve the model name from config or override
+            _model_name = model_name or getattr(config, "default_model", None) or "openai:gpt-4o"
+            model = init_chat_model(_model_name)
 
             tools = get_available_tools(app_config=config)
-            agent = create_agent(
+            agent = create_deerflow_agent(
+                model=model,
                 tools=tools,
-                model_name=model_name or config.default_model,
-                app_config=config,
             )
 
             # Build the message with context
@@ -292,9 +296,21 @@ def start_telegram_channel(config_path: Optional[str] = None) -> None:
     os.environ["DEER_FLOW_PROJECT_ROOT"] = str(PROJECT_ROOT)
 
     try:
-        from app.channels.telegram import start_telegram_bot
+        from app.channels.telegram import TelegramChannel
+        from app.channels.message_bus import MessageBus
+
         logger.info("Starting DeerFlow Telegram channel...")
-        start_telegram_bot()
+        # TelegramChannel requires a MessageBus and config dict.
+        # Load config to extract telegram settings.
+        from deerflow.config.app_config import reload_app_config
+        app_cfg = reload_app_config()
+        telegram_cfg = getattr(app_cfg, "telegram", {}) or {}
+        if isinstance(telegram_cfg, dict) is False:
+            telegram_cfg = telegram_cfg.model_dump() if hasattr(telegram_cfg, "model_dump") else dict(telegram_cfg)
+
+        bus = MessageBus()
+        channel = TelegramChannel(bus=bus, config=telegram_cfg)
+        asyncio.run(channel.start())
     except ImportError as e:
         logger.warning("DeerFlow Telegram channel not available: %s", e)
         logger.info("Ensure python-telegram-bot is installed and DeerFlow backend is on PYTHONPATH")
