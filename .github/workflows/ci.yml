@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: rust
+        working-directory: mining-super-agent/rust
     steps:
       - uses: actions/checkout@v4
 
@@ -69,7 +69,7 @@ jobs:
         with:
           path: |
             rust/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('mining-super-agent/rust/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build (release)
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: flutter_app
+        working-directory: mining-super-agent/flutter_app
     steps:
       - uses: actions/checkout@v4
 
@@ -118,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mining-super-agent-apk
-          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          path: mining-super-agent/flutter_app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
           if-no-files-found: error
 
