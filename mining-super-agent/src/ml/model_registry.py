@@ -172,12 +172,13 @@ class ModelRegistry:
     #  Rollback
     # ------------------------------------------------------------------ #
 
-    def rollback(self, model_name: str, to_version: str) -> bool:
+    def rollback(self, model_name: str, to_version: str, reason: str = "manual") -> bool:
         """Rollback a model to a specific previous version.
 
         Args:
             model_name: Name of the model to rollback.
             to_version: Target version string.
+            reason: Audit reason ("manual" or "auto_degradation").
 
         Returns:
             True if rollback succeeded, False if version not found.
@@ -188,10 +189,10 @@ class ModelRegistry:
                 previous_version = self._registry["active"].get(model_name)
                 self._registry["active"][model_name] = to_version
                 self._save_registry()
-                self._log_rollback(model_name, to_version, previous_version)
+                self._log_rollback(model_name, to_version, previous_version, reason=reason)
                 logger.info(
-                    "Rolled back %s from v%s to v%s",
-                    model_name, previous_version, to_version,
+                    "Rolled back %s from v%s to v%s (reason=%s)",
+                    model_name, previous_version, to_version, reason,
                 )
                 return True
         logger.warning(
@@ -338,10 +339,5 @@ class ModelRegistry:
             logger.error("No previous version found for %s; cannot rollback.", model_name)
             return None
 
-        current_version = self._registry["active"].get(model_name)
-        # rollback() already calls _log_rollback with reason="manual";
-        # override the last log entry's reason to "auto_degradation".
-        self.rollback(model_name, previous)
-        if self.rollback_log and self.rollback_log[-1]["model"] == model_name:
-            self.rollback_log[-1]["reason"] = "auto_degradation"
+        self.rollback(model_name, previous, reason="auto_degradation")
         return previous

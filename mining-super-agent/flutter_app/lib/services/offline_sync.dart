@@ -1,37 +1,63 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/observation.dart';
+import 'local_db.dart';
+import 'api_client.dart';
 
 class OfflineSyncService {
-  final List<Observation> _pendingQueue = [];
+  static final OfflineSyncService instance = OfflineSyncService._init();
+  OfflineSyncService._init();
+
   Timer? _syncTimer;
   bool _isSyncing = false;
+  final _db = LocalDatabase.instance;
+  final _api = ApiClient();
 
-  List<Observation> get pendingObservations => List.unmodifiable(_pendingQueue);
+  final StreamController<int> _pendingController = StreamController<int>.broadcast();
+  Stream<int> get pendingCountStream => _pendingController.stream;
 
   void start() {
     // Listen for connectivity changes
     Connectivity().onConnectivityChanged.listen((result) {
       if (result != ConnectivityResult.none) {
-        _syncPending();
+        syncPending();
       }
     });
 
     // Periodic sync attempt
-    _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) => _syncPending());
+    _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) => syncPending());
+
+    // Initial count broadcast
+    _broadcastPending();
   }
 
   void stop() {
     _syncTimer?.cancel();
   }
 
-  void addToQueue(Observation observation) {
-    _pendingQueue.add(observation);
-    _syncPending();
+  Future<int> saveObservation(Observation obs) async {
+    final id = await _db.insertObservation(obs);
+    _broadcastPending();
+    // Try to sync immediately
+    syncPending();
+    return id;
   }
 
-  Future<void> _syncPending() async {
-    if (_isSyncing || _pendingQueue.isEmpty) return;
+  Future<List<Observation>> getAllObservations() async {
+    return await _db.getAllObservations();
+  }
+
+  Future<int> getPendingCount() async {
+    return await _db.getPendingCount();
+  }
+
+  Future<void> deleteObservation(int id) async {
+    await _db.deleteObservation(id);
+    _broadcastPending();
+  }
+
+  Future<void> syncPending() async {
+    if (_isSyncing) return;
     _isSyncing = true;
 
     try {
@@ -41,15 +67,26 @@ class OfflineSyncService {
         return;
       }
 
-      // TODO: Upload to server
-      // For now, just clear the queue after a delay
-      await Future.delayed(const Duration(seconds: 1));
+      final pending = await _db.getUnsyncedObservations();
+      for (final obs in pending) {
+        try {
+          // Upload observation to server
+          await _api.post('/api/v1/observations', obs.toJson());
+          await _db.markSynced(obs.id!);
+        } catch (e) {
+          // Upload failed — will retry next sync cycle
+          break;
+        }
+      }
 
-      // In production: upload each observation, mark as synced on success
-      // _pendingQueue.removeWhere((o) => uploadSuccess);
-
+      _broadcastPending();
     } finally {
       _isSyncing = false;
     }
+  }
+
+  Future<void> _broadcastPending() async {
+    final count = await _db.getPendingCount();
+    _pendingController.add(count);
   }
 }
