@@ -73,3 +73,4 @@ src/
 | Market (prediction) | 60% | Price prediction inherently uncertain |
 | Geological | 85% | Interpretation, not observation |
 | Quantum | 80% | Quantum advantage but still probabilistic |
+# Trigger CI build
