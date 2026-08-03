@@ -166,7 +166,7 @@ class MiningDeerFlowAgent:
         Uses the existing SovereignResourceDAO directly.
         """
         try:
-            from src.main_legacy import SovereignResourceDAO
+            from src.superagent import SovereignResourceDAO
             agent = SovereignResourceDAO()
             result = await agent.analyze(question, context)
             return {
