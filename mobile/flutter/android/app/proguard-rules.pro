@@ -12,3 +12,7 @@
 
 # Keep camera
 -keep class io.flutter.plugins.camera.** { *; }
+
+# Keep Whisper JNI classes (native methods must not be stripped)
+-keep class com.sovereignresourcedao.WhisperNative { *; }
+-keep class com.sovereignresourcedao.WhisperPlugin { *; }

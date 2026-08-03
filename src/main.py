@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -28,6 +29,8 @@ from src.agents import list_agents, get_agent
 from src.dao.governance import GovernanceEngine
 from src.chain.oracle_bridge import get_oracle_bridge, OracleConfig
 from src.tools.fair_deal import evaluate_valentine_offer
+from src.api.routes.voice import router as voice_router
+from src.channels import get_registry, register_default_channels
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +40,16 @@ async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
     logger.info("Sovereign Resource DAO starting...")
     logger.info("Agents loaded: %d", len(list_agents()))
+
+    # Register and start messaging channels (Telegram, etc.)
+    await register_default_channels()
+    registry = get_registry()
+    await registry.start_all()
+
     yield
+
+    # Shutdown channels then exit
+    await registry.shutdown_all()
     logger.info("Sovereign Resource DAO shutting down.")
 
 
@@ -47,6 +59,84 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# ── Routers ────────────────────────────────────────────────────────────────
+
+app.include_router(voice_router)
+
+
+# ── Channel Routing (called by Telegram bot) ────────────────────────────────
+
+@app.post("/api/v1/channels/route")
+async def route_channel_message(payload: dict):
+    """
+    Route an inbound message from any channel (Telegram, WhatsApp, etc.)
+    to the AI agent pipeline.
+
+    Called by BackendClient.route_message() in the Telegram bot.
+    """
+    message_type = payload.get("message_type", "text")
+    text = payload.get("text", "")
+    sender = payload.get("sender_id", "unknown")
+    source = payload.get("source_channel", "unknown")
+
+    logger.info("Routing %s message from %s via %s", message_type, sender, source)
+
+    # Try to get a response from the super-agent
+    try:
+        from src.superagent import SovereignResourceDAO
+        agent = SovereignResourceDAO()
+        result = await agent.chat(
+            user_id=sender,
+            message=text or f"[{message_type} message received]",
+        )
+        return {
+            "text": result.get("response", "Message received."),
+            "message_id": str(uuid.uuid4()),
+            "parse_mode": "Markdown",
+        }
+    except Exception:
+        logger.exception("Agent routing failed, returning acknowledgment")
+        return {
+            "text": f"✅ Received your {message_type} message. Processing…",
+            "message_id": str(uuid.uuid4()),
+        }
+
+
+@app.post("/api/v1/media/upload")
+async def upload_media():
+    """Stub: media upload for channel routing."""
+    return {"url": "placeholder", "status": "uploaded"}
+
+
+@app.post("/api/v1/channels/telegram/verify-link")
+async def verify_telegram_link(payload: dict):
+    """Stub: verify a Telegram link code."""
+    return {"account_id": "demo-account", "community_name": "Sovereign Resource DAO"}
+
+
+@app.get("/api/v1/channels/telegram/user/{telegram_user_id}")
+async def get_telegram_user(telegram_user_id: int):
+    """Stub: get Telegram user context."""
+    return {
+        "account_id": f"user-{telegram_user_id}",
+        "community_name": "Sovereign Resource DAO",
+        "role": "member",
+        "linked_channels": [{"type": "telegram", "status": "connected"}],
+    }
+
+
+@app.post("/api/v1/channels/receipt")
+async def delivery_receipt(payload: dict):
+    """Stub: delivery receipt from channels."""
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/governance/proposals/active")
+async def active_proposals():
+    """Stub: list active proposals for the Telegram bot's /vote command."""
+    return {"proposals": governance.get_active_proposals()}
+
 
 # CORS — restrict in production
 app.add_middleware(

@@ -773,7 +773,7 @@ class TelegramBot:
                 pass
 
     async def _handle_audio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle voice messages and audio files."""
+        """Handle voice messages and audio files via NVIDIA NIM Whisper."""
         if not update.message or not update.effective_user:
             return
         user = update.effective_user
@@ -797,18 +797,33 @@ class TelegramBot:
             audio_bytes = bytearray()
             await file.download_as_bytearray(bytearray_obj=audio_bytes)
 
+            # Step 1: Transcribe via the voice endpoint (NVIDIA NIM Whisper)
+            transcript = await self._transcribe_audio(
+                audio_bytes=bytes(audio_bytes),
+                filename=f"audio_{media.file_id[-8:]}.{ext}",
+                content_type=mime,
+            )
+
+            if not transcript:
+                await processing_msg.edit_text("🎤 Couldn't transcribe audio. Try again?")
+                return
+
+            # Step 2: Route the transcribed text to the AI agent pipeline
             result = await self.backend.route_message(
                 telegram_user_id=user.id,
                 chat_id=update.effective_chat.id,
-                message_type="audio",
-                media_bytes=bytes(audio_bytes),
-                media_filename=f"audio_{media.file_id[-8:]}.{ext}",
-                media_mime=mime,
+                message_type="text",
+                text=f"[Voice message transcript]: {transcript}",
                 thread_id=session.thread_id,
             )
 
             await processing_msg.delete()
-            for chunk in self._split_message(result.get("text", "Audio processed."), 4000):
+
+            # Show the transcript and the AI response
+            response_text = result.get("text", "I received your voice message.")
+            full_response = f"🎤 *Transcript:* {transcript}\n\n{response_text}"
+
+            for chunk in self._split_message(full_response, 4000):
                 await update.message.reply_text(chunk, parse_mode="Markdown")
 
         except Exception:
@@ -817,6 +832,31 @@ class TelegramBot:
                 await processing_msg.edit_text("❌ Failed to process audio.")
             except Exception:
                 pass
+
+    async def _transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> str | None:
+        """
+        Call the backend's /api/v1/voice/transcribe endpoint.
+        Returns the transcript text, or None on failure.
+        """
+        try:
+            resp = await self.backend._client.post(
+                "/api/v1/voice/transcribe",
+                files={"file": (filename, io.BytesIO(audio_bytes), content_type)},
+                timeout=120.0,
+            )
+            resp.raise_for_status()
+            return resp.json().get("text", "").strip() or None
+        except httpx.HTTPStatusError as e:
+            logger.error("Transcription API error: %d — %s", e.response.status_code, e.response.text[:300])
+            return None
+        except Exception:
+            logger.exception("Transcription request failed")
+            return None
 
     async def _handle_location(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle shared locations — find nearby resources."""
@@ -1073,6 +1113,68 @@ def create_telegram_bot() -> TelegramBot:
         webhook_url=webhook_url,
         allowed_user_ids=allowed_ids,
     )
+
+
+# ── Channel Adapter (for registry integration) ──────────────────────────────
+
+
+class TelegramBotChannel:
+    """
+    Adapter that wraps TelegramBot so it satisfies the Channel protocol
+    used by ChannelRegistry in channels/__init__.py.
+
+    In polling mode the bot runs in a background task; the FastAPI server
+    and the Telegram bot share the same event loop.
+    """
+
+    channel_type: str = "telegram"
+
+    def __init__(
+        self,
+        token: str,
+        backend_url: str = "http://localhost:8000",
+        webhook_url: str | None = None,
+    ):
+        self._bot = TelegramBot(
+            token=token,
+            backend_url=backend_url,
+            webhook_url=webhook_url,
+        )
+        self._app: Application | None = None
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        """Build the Application, start polling in a background task."""
+        self._app = self._bot.build_application()
+        await self._app.initialize()
+        await self._app.start()
+        await self._app.updater.start_polling(drop_pending_updates=True)
+        logger.info("Telegram bot started (polling)")
+
+    async def stop(self) -> None:
+        if self._app and self._app.updater:
+            await self._app.updater.stop()
+            await self._app.stop()
+            await self._app.shutdown()
+        await self._bot.backend.close()
+        logger.info("Telegram bot stopped")
+
+    async def send_message(
+        self,
+        recipient_id: str,
+        text: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Push a message to a Telegram chat by chat_id."""
+        if self._app is None:
+            raise RuntimeError("Telegram bot not started")
+        chat_id = int(recipient_id)
+        msg = await self._app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=kwargs.get("parse_mode", "Markdown"),
+        )
+        return {"message_id": str(msg.message_id), "status": "sent"}
 
 
 # ── CLI Entry Point ──────────────────────────────────────────────────────────
