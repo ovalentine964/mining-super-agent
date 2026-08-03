@@ -1,0 +1,133 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APK_NAME: sovereign-resource-dao
+  FLUTTER_DIR: mobile/flutter
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_DIR }}
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # Strip leading 'v' for version name
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Prepare signing keystore
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
+        run: |
+          mkdir -p android/app/keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore/release.jks
+          echo "KEYSTORE_FILE=keystore/release.jks" >> "$GITHUB_ENV"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos || true
+
+      - name: Run tests
+        run: flutter test || true
+
+      - name: Build release APK (all ABIs)
+        run: flutter build apk --release
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename APK with version
+        id: apk
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          OUT="build/app/outputs/flutter-apk/${APK_NAME}-v${VERSION}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "filename=${APK_NAME}-v${VERSION}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Get APK size
+        id: size
+        run: |
+          BYTES=$(stat -c%s "${{ steps.apk.outputs.path }}")
+          KB=$((BYTES / 1024))
+          MB=$((KB / 1024))
+          echo "size=${MB}.${KB#*$((MB*1024/10))} MB" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Sovereign Resource DAO ${{ steps.tag.outputs.tag }}"
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
+          generate_release_notes: true
+          body: |
+            ## 📱 Sovereign Resource DAO — Android Release
+
+            **Version:** ${{ steps.tag.outputs.version }}
+            **APK Size:** ~${{ steps.size.outputs.size }}
+            **Min Android:** 6.0 (API 23)
+            **Target Android:** 14 (API 34)
+
+            ### 📥 Download
+            Download the APK from the **Assets** section below or use:
+            ```
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/${{ steps.apk.outputs.filename }}
+            ```
+
+            ### 🔑 Signing
+            This release is signed${{ env.HAS_KEYSTORE == 'true' && ' with the project release key.' || ' with the debug keystore (CI fallback). Set KEYSTORE_BASE64 secret for production signing.' }}
+
+            ### 📋 Installation
+            1. Download the APK
+            2. Enable "Install from unknown sources" on your device
+            3. Open the APK to install
+          files: ${{ steps.apk.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

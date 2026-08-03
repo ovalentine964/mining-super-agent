@@ -78,10 +78,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Install dependencies
         run: flutter pub get
@@ -92,8 +104,8 @@ jobs:
       - name: Run tests
         run: flutter test || true
 
-      - name: Build APK (release)
-        run: flutter build apk --release --target-platform android-arm64
+      - name: Build APK (release, all ABIs)
+        run: flutter build apk --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -101,7 +113,7 @@ jobs:
           name: sovereign-resource-dao-apk
           path: mobile/flutter/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ──────────────────────────────────────────────
   # Smart Contracts — compile
