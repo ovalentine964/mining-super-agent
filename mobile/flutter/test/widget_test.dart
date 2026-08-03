@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:mining_super_agent/main.dart';
-import 'package:mining_super_agent/models/observation.dart';
-import 'package:mining_super_agent/services/locale_provider.dart';
+import 'package:sovereign_resource_dao/main.dart';
+import 'package:sovereign_resource_dao/models/observation.dart';
+import 'package:sovereign_resource_dao/services/locale_provider.dart';
 
 void main() {
   group('MiningApp Widget Tests', () {
@@ -21,7 +21,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 2));
 
       // Verify the app title appears
-      expect(find.text('Mining Super-Agent'), findsOneWidget);
+      expect(find.text('Sovereign Resource DAO'), findsOneWidget);
 
       // Verify menu cards exist
       expect(find.byIcon(Icons.camera_alt), findsOneWidget);

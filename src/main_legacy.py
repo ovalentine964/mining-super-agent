@@ -1,7 +1,7 @@
 """
-Mining Super-Agent — DeerFlow Entry Point.
+Sovereign Resource DAO — DeerFlow Entry Point.
 
-This is the main entry point that starts the Mining Super-Agent
+This is the main entry point that starts the Sovereign Resource DAO
 powered by the DeerFlow harness.
 
 Usage:
@@ -35,7 +35,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-logger = logging.getLogger("mining-super-agent")
+logger = logging.getLogger("sovereign-resource-dao")
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -48,9 +48,9 @@ def setup_logging(level: str = "INFO") -> None:
 
 
 def main() -> None:
-    """Main entry point for the Mining Super-Agent."""
+    """Main entry point for the Sovereign Resource DAO."""
     parser = argparse.ArgumentParser(
-        description="Mining Super-Agent powered by DeerFlow",
+        description="Sovereign Resource DAO powered by DeerFlow",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -135,7 +135,7 @@ def main() -> None:
     register_mining_skills()
 
     logger.info("=" * 60)
-    logger.info("  MINING SUPER-AGENT — Powered by DeerFlow 2.0")
+    logger.info("  SOVEREIGN RESOURCE DAO — Powered by DeerFlow 2.0")
     logger.info("=" * 60)
     logger.info("Config: %s", args.config or "default")
     logger.info("Gateway: http://%s:%d", args.host, args.port)

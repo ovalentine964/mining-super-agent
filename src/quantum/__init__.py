@@ -1,5 +1,5 @@
 """
-Quantum Computing Integration for Mining Super-Agent.
+Quantum Computing Integration for Sovereign Resource DAO.
 Provides quantum-enhanced ML and optimization with automatic classical fallbacks.
 """
 

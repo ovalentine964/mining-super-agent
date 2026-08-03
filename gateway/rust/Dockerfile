@@ -37,7 +37,7 @@ RUN groupadd -r mining && useradd -r -g mining -s /bin/false mining
 WORKDIR /app
 
 # Copy binary
-COPY --from=builder /app/target/release/mining-super-agent /usr/local/bin/mining-super-agent
+COPY --from=builder /app/target/release/sovereign-resource-dao /usr/local/bin/sovereign-resource-dao
 
 # Copy config files
 COPY --from=builder /app/config/ /app/config/ 2>/dev/null || true
@@ -51,4 +51,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["mining-super-agent"]
+CMD ["sovereign-resource-dao"]

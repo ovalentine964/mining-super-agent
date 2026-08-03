@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .init();
 
-    info!("Starting Mining Super Agent (Rust/Actix-web)");
+    info!("Starting Sovereign Resource DAO (Rust/Actix-web)");
 
     // Load config
     let config = AppConfig::from_env().expect("Failed to load configuration");
@@ -129,7 +129,7 @@ async fn main() -> std::io::Result<()> {
 async fn health_check() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "healthy",
-        "service": "mining-super-agent",
+        "service": "sovereign-resource-dao",
         "version": "1.0.0"
     }))
 }

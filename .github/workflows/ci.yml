@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: mining-super-agent/rust
+        working-directory: sovereign-resource-dao/rust
     steps:
       - uses: actions/checkout@v4
 
@@ -69,7 +69,7 @@ jobs:
         with:
           path: |
             rust/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('mining-super-agent/rust/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('sovereign-resource-dao/rust/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build (release)
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: mining-super-agent/flutter_app
+        working-directory: sovereign-resource-dao/mobile/flutter
     steps:
       - uses: actions/checkout@v4
 
@@ -117,8 +117,8 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mining-super-agent-apk
-          path: mining-super-agent/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          name: sovereign-resource-dao-apk
+          path: sovereign-resource-dao/mobile/flutter/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
           if-no-files-found: error
 

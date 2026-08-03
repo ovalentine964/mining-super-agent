@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mining Super-Agent — Database Backup Script
+# Sovereign Resource DAO — Database Backup Script
 # pg_dump with gzip compression → S3 upload with KMS encryption
 # 7-day rotation: keeps daily backups for 7 days, weekly for 4 weeks, monthly for 12 months
 #
@@ -28,7 +28,7 @@ if [ -f "${PROJECT_DIR}/.env" ]; then
 fi
 
 # Required variables
-DB_CONTAINER="${DB_CONTAINER:-mining-super-agent-postgres-1}"
+DB_CONTAINER="${DB_CONTAINER:-sovereign-resource-dao-postgres-1}"
 POSTGRES_USER="${POSTGRES_USER:-mining}"
 POSTGRES_DB="${POSTGRES_DB:-mining}"
 
@@ -250,7 +250,7 @@ verify_backup() {
 
 # ── Main ────────────────────────────────────────────────────────
 main() {
-    log "=== Mining Super-Agent Backup ==="
+    log "=== Sovereign Resource DAO Backup ==="
     log "Timestamp: ${TIMESTAMP}"
     log "Type: $([ "${SCHEMA_ONLY}" = true ] && echo 'schema-only' || echo 'full')"
     log ""

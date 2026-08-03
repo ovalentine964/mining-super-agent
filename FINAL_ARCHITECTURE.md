@@ -32,7 +32,7 @@
 
 ## 1. EXECUTIVE SUMMARY
 
-**What:** An AI-powered Mining Super-Agent that corrects the information asymmetry exploited by foreign mining companies in Kenya.
+**What:** An AI-powered Sovereign Resource DAO that corrects the information asymmetry exploited by foreign mining companies in Kenya.
 
 **Why:** Valentine Owuor's family land in Nyatike, Migori County has gold and copper. Chinese companies offer 1M KES for land worth 40-65B KES. The system gives miners the data they need to negotiate fair deals.
 

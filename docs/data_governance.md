@@ -1,4 +1,4 @@
-# Data Governance — Mining Super-Agent
+# Data Governance — Sovereign Resource DAO
 
 ## 1. Data Ownership
 

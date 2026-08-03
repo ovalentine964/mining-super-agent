@@ -1,1 +1,1 @@
-# Mining Super-Agent — Tests
+# Sovereign Resource DAO — Tests

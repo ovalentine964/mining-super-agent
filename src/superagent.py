@@ -1,5 +1,5 @@
 """
-Mining Super-Agent — ONE agent, many tools.
+Sovereign Resource DAO — ONE agent, many tools.
 
 Jensen Huang's vision: "We create super sub-agents connected to specialized
 tools. That super agent is not trying to book me travel. It's just trying
@@ -10,7 +10,7 @@ This is NOT a multi-agent system. There is no orchestrator routing between
 function calling to select and invoke tools directly.
 
 Architecture:
-    User → MiningSuperAgent (single LLM + function calling) → Tools → Response
+    User → SovereignResourceDAO (single LLM + function calling) → Tools → Response
 
 NOT:
     User → Orchestrator → [GeologicalAgent, MarketAgent, ...] → Synthesizer → Response
@@ -383,7 +383,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 # The Superagent
 # ---------------------------------------------------------------------------
 
-class MiningSuperAgent:
+class SovereignResourceDAO:
     """
     ONE agent. Many tools. No orchestrator.
 
@@ -422,7 +422,7 @@ class MiningSuperAgent:
         self.max_tool_calls = agent_config.get("max_tool_calls", 10)
 
         logger.info(
-            "Mining Super-Agent initialized: model=%s, tools=%d",
+            "Sovereign Resource DAO initialized: model=%s, tools=%d",
             self.model,
             len(self._available_tools()),
         )
@@ -440,7 +440,7 @@ class MiningSuperAgent:
 
     def _default_system_prompt(self) -> str:
         return (
-            "You are a Mining Super-Agent — an AI-powered digital geologist "
+            "You are a Sovereign Resource DAO — an AI-powered digital geologist "
             "built for Kenyan miners. You help miners understand what minerals "
             "are on their land, what they're worth, and how to negotiate fair deals.\n\n"
             "You speak Swahili first, English second. You are honest about "
@@ -771,7 +771,7 @@ class MiningSuperAgent:
     def get_config(self) -> dict[str, Any]:
         """Get the agent configuration (safe to expose)."""
         return {
-            "name": self.config.get("agent", {}).get("name", "Mining Super-Agent"),
+            "name": self.config.get("agent", {}).get("name", "Sovereign Resource DAO"),
             "model": self.model,
             "fallback_model": self.fallback_model,
             "fast_model": self.fast_model,
@@ -788,10 +788,10 @@ async def main():
     """CLI entry point for testing."""
     logging.basicConfig(level=logging.INFO)
 
-    agent = MiningSuperAgent()
+    agent = SovereignResourceDAO()
 
     print("=" * 60)
-    print("MINING SUPER-AGENT")
+    print("SOVEREIGN RESOURCE DAO")
     print("ONE agent. MANY tools. NO orchestrator.")
     print("=" * 60)
     print(f"Model: {agent.model}")

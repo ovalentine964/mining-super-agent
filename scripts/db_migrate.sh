@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mining Super-Agent — Database Migration (upgrade to latest)
+# Sovereign Resource DAO — Database Migration (upgrade to latest)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

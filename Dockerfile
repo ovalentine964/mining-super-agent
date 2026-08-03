@@ -1,4 +1,4 @@
-# Mining Super-Agent — Production Dockerfile
+# Sovereign Resource DAO — Production Dockerfile
 # Multi-stage build for minimal image size
 
 FROM python:3.12-slim AS base

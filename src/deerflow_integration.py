@@ -1,5 +1,5 @@
 """
-DeerFlow Integration — Bridge between DeerFlow harness and Mining Super-Agent.
+DeerFlow Integration — Bridge between DeerFlow harness and Sovereign Resource DAO.
 
 This module:
 1. Configures DeerFlow with mining-specific settings
@@ -163,11 +163,11 @@ class MiningDeerFlowAgent:
     ) -> dict[str, Any]:
         """
         Fallback query handler when DeerFlow is not fully installed.
-        Uses the existing MiningSuperAgent directly.
+        Uses the existing SovereignResourceDAO directly.
         """
         try:
-            from src.main_legacy import MiningSuperAgent
-            agent = MiningSuperAgent()
+            from src.main_legacy import SovereignResourceDAO
+            agent = SovereignResourceDAO()
             result = await agent.analyze(question, context)
             return {
                 "success": result.success,

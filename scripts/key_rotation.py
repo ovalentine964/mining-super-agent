@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-API Key Rotation Script — Secure key rotation for the Mining Super-Agent.
+API Key Rotation Script — Secure key rotation for the Sovereign Resource DAO.
 
 This script handles the complete lifecycle of key rotation:
 1. Generate a new encryption key
@@ -171,7 +171,7 @@ def reencrypt_database_columns(old_key: str, new_key: str, dry_run: bool = False
 
     def make_fernet(master_key_str: str) -> Fernet:
         key_bytes = master_key_str.encode() if master_key_str.startswith("gAA") else base64.urlsafe_b64decode(master_key_str)
-        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"mining-super-agent-db-encryption")
+        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"sovereign-resource-dao-db-encryption")
         derived = hkdf.derive(key_bytes)
         return Fernet(base64.urlsafe_b64encode(derived))
 
@@ -374,7 +374,7 @@ def rotate_jwt_refresh_secret(env_path: Path, dry_run: bool = False) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Rotate encryption and authentication keys for Mining Super-Agent",
+        description="Rotate encryption and authentication keys for Sovereign Resource DAO",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

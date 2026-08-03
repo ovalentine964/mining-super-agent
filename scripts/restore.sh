@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mining Super-Agent — Database Restore Script
+# Sovereign Resource DAO — Database Restore Script
 # Restores from a gzip-compressed pg_dump backup with verification
 #
 # Usage:
@@ -21,7 +21,7 @@ if [ -f "${PROJECT_DIR}/.env" ]; then
     set +a
 fi
 
-DB_CONTAINER="${DB_CONTAINER:-mining-super-agent-postgres-1}"
+DB_CONTAINER="${DB_CONTAINER:-sovereign-resource-dao-postgres-1}"
 POSTGRES_USER="${POSTGRES_USER:-mining}"
 POSTGRES_DB="${POSTGRES_DB:-mining}"
 
@@ -259,7 +259,7 @@ perform_restore() {
 
 # ── Main ────────────────────────────────────────────────────────
 main() {
-    log "=== Mining Super-Agent Database Restore ==="
+    log "=== Sovereign Resource DAO Database Restore ==="
     log ""
 
     check_prerequisites

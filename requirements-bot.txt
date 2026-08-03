@@ -1,4 +1,4 @@
-# Mining Super-Agent Telegram Bot — Dependencies
+# Sovereign Resource DAO Telegram Bot — Dependencies
 
 # Telegram bot framework (v21+)
 python-telegram-bot>=21.0

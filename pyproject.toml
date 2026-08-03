@@ -1,12 +1,12 @@
 [project]
-name = "mining-super-agent"
+name = "sovereign-resource-dao"
 version = "2.0.0"
-description = "AI-Powered Mining Super-Agent — Enterprise-grade system for mineral exploration, geological analysis, and market intelligence. Powered by DeerFlow 2.0."
+description = "Sovereign Resource DAO — Institutional-grade platform for mineral exploration, geological analysis, market intelligence, and decentralized resource governance. Powered by DeerFlow 2.0."
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
-    {name = "Valentine Owuor", email = "valentine@miningsuperagent.com"}
+    {name = "Valentine Owuor", email = "valentine@sovereignresourcedao.com"}
 ]
 
 dependencies = [

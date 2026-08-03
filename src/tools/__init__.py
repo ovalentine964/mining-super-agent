@@ -1,5 +1,5 @@
 """
-Mining Super-Agent Tools
+Sovereign Resource DAO Tools
 ========================
 
 These are TOOLS that the superagent uses — NOT separate agents.

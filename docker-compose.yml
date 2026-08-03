@@ -1,4 +1,4 @@
-# Mining Super-Agent — Production Docker Compose
+# Sovereign Resource DAO — Production Docker Compose
 # Oracle Cloud Free Tier: 4 ARM cores, 24GB RAM total
 # All databases on internal network only (no port mapping)
 
@@ -168,7 +168,7 @@ services:
       JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:?JWT_REFRESH_SECRET_KEY must be set}
       API_KEYS_ENCRYPTION_KEY: ${API_KEYS_ENCRYPTION_KEY:?API_KEYS_ENCRYPTION_KEY must be set}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
-      MFA_ISSUER_NAME: ${MFA_ISSUER_NAME:-Mining Super-Agent}
+      MFA_ISSUER_NAME: ${MFA_ISSUER_NAME:-Sovereign Resource DAO}
       # External APIs
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
