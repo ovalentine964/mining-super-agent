@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="description" content="Sovereign Resource DAO — Community Dashboard. Live mineral prices, extraction records, governance proposals, and satellite monitoring for community-owned resource governance.">
+  <meta name="theme-color" content="#0a0f1a">
+  <meta name="color-scheme" content="dark">
+
+  <!-- Open Graph for embeds -->
+  <meta property="og:title" content="Sovereign Resource DAO — Community Dashboard">
+  <meta property="og:description" content="Live mineral intelligence and community governance">
+  <meta property="og:type" content="website">
+
+  <title>Sovereign Resource DAO — Dashboard</title>
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="dashboard.css">
+
+  <!-- Inline critical config so it can be overridden before script loads -->
+  <script>
+    // Override API base URL: set window.__DAO_API_BASE before this script loads
+    // e.g. <script>window.__DAO_API_BASE = 'https://api.example.com';</script>
+    window.__DAO_API_BASE = window.__DAO_API_BASE || '';
+  </script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       HEADER
+       ════════════════════════════════════════════════════════ -->
+  <header class="dashboard-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="brand-icon">⛏️</div>
+        <div class="brand-text">
+          <h1 id="brand-title">Sovereign Resource DAO</h1>
+          <div class="subtitle" id="brand-subtitle">Community Dashboard</div>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Language Toggle -->
+        <div class="lang-toggle">
+          <button class="lang-btn active" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="sw">SW</button>
+        </div>
+
+        <!-- Blockchain Status -->
+        <span id="chain-status" class="status-badge loading">Loading…</span>
+
+        <!-- Refresh Indicator -->
+        <div class="refresh-indicator">
+          <span class="refresh-dot"></span>
+          <span id="last-updated">—</span>
+        </div>
+
+        <!-- Manual Refresh -->
+        <button id="manual-refresh" style="background:none;border:1px solid var(--border);border-radius:8px;padding:0.35rem 0.6rem;color:var(--text-muted);cursor:pointer;font-size:0.85rem" title="Refresh now">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════
+       ERROR BANNERS
+       ════════════════════════════════════════════════════════ -->
+  <div id="error-container" style="max-width:1400px;margin:0 auto;padding:0 1.25rem"></div>
+
+  <!-- ════════════════════════════════════════════════════════
+       MAIN CONTENT
+       ════════════════════════════════════════════════════════ -->
+  <main class="dashboard-main">
+
+    <!-- ── Mineral Prices ──────────────────────────────────── -->
+    <section>
+      <div class="section-title">
+        <span class="icon">💎</span>
+        <span class="i18n-title" data-i18n="mineralPrices">Mineral Prices</span>
+        <span class="card-badge i18n-title" data-i18n="realTime">Real-time</span>
+      </div>
+      <div id="prices-grid" class="grid-prices">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- ── Community Stats (KPIs) ──────────────────────────── -->
+    <section>
+      <div class="section-title">
+        <span class="icon">📊</span>
+        <span class="i18n-title" data-i18n="communityStats">Community Overview</span>
+      </div>
+      <div id="stats-grid" class="grid-stats">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- ── Two-Column: Fairness Index + Governance ─────────── -->
+    <div class="grid-2col">
+
+      <!-- Fairness Index -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon">⚖️</span>
+            <span class="i18n-title" data-i18n="extractionFairness">Extraction Fairness Index</span>
+          </div>
+        </div>
+        <div class="fairness-section">
+          <div class="gauge-container">
+            <svg viewBox="0 0 200 100" style="width:100%;height:100%">
+              <path d="M 20 90 A 80 80 0 0 1 180 90" class="gauge-bg"/>
+              <path d="M 20 90 A 80 80 0 0 1 180 90" class="gauge-fill" id="fairness-gauge"
+                    stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                    style="stroke:var(--text-muted)"/>
+            </svg>
+            <div class="gauge-value" id="fairness-value">—</div>
+          </div>
+          <div id="fairness-verdict" class="gauge-verdict"></div>
+          <div id="fairness-desc" class="gauge-label" style="margin-top:0.75rem">
+            Measures how fair current extraction deals are for the community
+          </div>
+          <div id="fairness-section-desc" class="i18n-title" data-i18n="fairnessDesc" style="display:none"></div>
+        </div>
+      </section>
+
+      <!-- Governance Proposals -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon">🏛️</span>
+            <span class="i18n-title" data-i18n="governanceProposals">Governance Proposals</span>
+          </div>
+        </div>
+        <div id="proposals-content">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Two-Column: Extraction Records + Royalties ──────── -->
+    <div class="grid-2col">
+
+      <!-- Extraction Records -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon">⛏️</span>
+            <span class="i18n-title" data-i18n="extractionRecords">Extraction Records</span>
+          </div>
+        </div>
+        <div id="extractions-content">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Royalty Distributions -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon">💰</span>
+            <span class="i18n-title" data-i18n="royaltyDistributions">Royalty Distributions</span>
+          </div>
+        </div>
+        <div id="royalties-content">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Satellite Monitoring (full width) ───────────────── -->
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🛰️</span>
+          <span class="i18n-title" data-i18n="satelliteMonitoring">Satellite Monitoring</span>
+        </div>
+        <span class="card-badge">Sentinel-2</span>
+      </div>
+      <div id="satellite-content">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ════════════════════════════════════════════════════════
+       FOOTER
+       ════════════════════════════════════════════════════════ -->
+  <footer class="dashboard-footer">
+    <span id="footer-text">Powered by Sovereign Resource DAO</span>
+    <span id="footer-refresh">Auto-refresh every 30s</span>
+    <span>v1.0.0</span>
+  </footer>
+
+  <!-- Dashboard Script -->
+  <script src="dashboard.js"></script>
+
+</body>
+</html>
