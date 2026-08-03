@@ -78,10 +78,13 @@ pub async fn nearby_sites(
                 "radius_meters": query.radius_meters
             }
         })),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "query_failed",
-            "message": e.to_string()
-        })),
+        Err(e) => {
+            tracing::error!("Nearby sites query failed: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "query_failed",
+                "message": "Failed to query nearby sites"
+            }))
+        }
     }
 }
 

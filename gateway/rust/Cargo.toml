@@ -50,6 +50,9 @@ dashmap = "5"
 # Error handling
 anyhow = "1"
 
+# JSON Schema validation
+jsonschema = "0.17"
+
 # Blockchain (NEW — Institutional grade)
 ethers = "2.0"
 hex = "0.4"

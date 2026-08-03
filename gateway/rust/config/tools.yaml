@@ -12,6 +12,8 @@ tools:
     cache_ttl_secs: 300
     timeout_secs: 120
     enabled: true
+    required_params:
+      - "coordinates"
 
   - name: rock_classification
     description: "Classify rock types from geological samples"
@@ -22,6 +24,8 @@ tools:
     cache_ttl_secs: 600
     timeout_secs: 60
     enabled: true
+    required_params:
+      - "sample_data"
 
   - name: mineral_prediction
     description: "Predict mineral deposits based on geological features"
@@ -32,6 +36,8 @@ tools:
     cache_ttl_secs: 300
     timeout_secs: 180
     enabled: true
+    required_params:
+      - "features"
 
   # ── Satellite Processing ────────────────────────────────────────
   - name: ndvi_analysis
@@ -43,6 +49,8 @@ tools:
     cache_ttl_secs: 600
     timeout_secs: 300
     enabled: true
+    required_params:
+      - "coordinates"
 
   - name: change_detection
     description: "Detect land changes from multi-temporal satellite imagery"
@@ -53,6 +61,9 @@ tools:
     cache_ttl_secs: 900
     timeout_secs: 300
     enabled: true
+    required_params:
+      - "coordinates"
+      - "date_range"
 
   - name: mineral_mapping
     description: "Map mineral distribution from hyperspectral satellite data"
@@ -63,6 +74,8 @@ tools:
     cache_ttl_secs: 900
     timeout_secs: 300
     enabled: true
+    required_params:
+      - "coordinates"
 
   # ── Market Data ─────────────────────────────────────────────────
   - name: commodity_price
@@ -74,6 +87,8 @@ tools:
     cache_ttl_secs: 30
     timeout_secs: 10
     enabled: true
+    required_params:
+      - "symbol"
 
   - name: market_forecast
     description: "Generate AI-powered commodity price forecasts"
@@ -84,6 +99,8 @@ tools:
     cache_ttl_secs: 600
     timeout_secs: 120
     enabled: true
+    required_params:
+      - "symbol"
 
   # ── Vision / ML ─────────────────────────────────────────────────
   - name: geological_imagery_analysis
@@ -95,6 +112,8 @@ tools:
     cache_ttl_secs: 300
     timeout_secs: 120
     enabled: true
+    required_params:
+      - "image_url"
 
   - name: equipment_inspection
     description: "Inspect mining equipment from drone/surveillance imagery"
@@ -105,6 +124,8 @@ tools:
     cache_ttl_secs: 300
     timeout_secs: 120
     enabled: true
+    required_params:
+      - "image_url"
 
   # ── Quantum Optimization ────────────────────────────────────────
   - name: portfolio_optimization
@@ -116,6 +137,8 @@ tools:
     cache_ttl_secs: 1800
     timeout_secs: 600
     enabled: true
+    required_params:
+      - "objective"
 
   - name: logistics_optimization
     description: "Optimize mining logistics and supply chain routing"
@@ -126,3 +149,5 @@ tools:
     cache_ttl_secs: 1800
     timeout_secs: 600
     enabled: true
+    required_params:
+      - "objective"

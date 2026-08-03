@@ -5,7 +5,7 @@ Uses mocked LLM — no NVIDIA_API_KEY required.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from src.superagent import SovereignResourceDAO, ConversationMemory, TOOL_SCHEMAS
 
@@ -20,8 +20,7 @@ def memory():
 @pytest.fixture
 def agent():
     """Create a SovereignResourceDAO with no config dir (uses defaults)."""
-    with patch("src.superagent.ToolRegistry"):
-        a = SovereignResourceDAO(config_dir="/nonexistent")
+    a = SovereignResourceDAO(config_dir="/nonexistent")
     return a
 
 

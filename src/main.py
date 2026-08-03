@@ -35,22 +35,33 @@ from src.tools.fair_deal import evaluate_valentine_offer
 from src.api.routes.voice import router as voice_router
 from src.channels import get_registry, register_default_channels
 
-# ── Database Engine (SQLAlchemy connection pool) ─────────────────────────
+# ── Database Engine (SQLAlchemy connection pool, lazy init) ─────────────
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost:5432/sovereign_dao")
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,       # Verify connections before use
-    pool_recycle=3600,         # Recycle connections after 1 hour
-    echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Lazy engine creation — avoids blocking import when DB is unreachable
+engine = None
+SessionLocal = None
+
+
+def _ensure_engine():
+    """Create the SQLAlchemy engine on first use, not at import time."""
+    global engine, SessionLocal
+    if engine is None:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
+        )
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return engine
+
 
 logger = logging.getLogger(__name__)
 

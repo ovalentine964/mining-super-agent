@@ -159,6 +159,16 @@ async fn execute_tool(
         }
     };
 
+    // Validate input parameters against tool schema (V-24)
+    if let Err(validation_err) = state.tools.validate_params(&tool_name, &body) {
+        tracing::warn!("Tool '{}' parameter validation failed: {}", tool_name, validation_err);
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "invalid_parameters",
+            "tool": tool_name,
+            "message": validation_err
+        }));
+    }
+
     // Compute deterministic cache key (used for both read and write)
     let cache_key = format!("cache:tool:{}:{}", tool_name, {
         use std::collections::hash_map::DefaultHasher;
@@ -259,9 +269,12 @@ async fn tool_stats(
     let tool_name = path.into_inner();
     match state.db.get_tool_stats(&tool_name).await {
         Ok(stats) => HttpResponse::Ok().json(stats),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "failed_to_get_stats",
-            "message": e.to_string()
-        })),
+        Err(e) => {
+            tracing::error!("Failed to get tool stats for '{}': {}", tool_name, e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "failed_to_get_stats",
+                "message": "Unable to retrieve tool statistics"
+            }))
+        }
     }
 }

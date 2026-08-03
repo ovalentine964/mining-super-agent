@@ -15,6 +15,10 @@ pub struct ToolConfig {
     pub cache_ttl_secs: Option<u64>,
     pub timeout_secs: Option<u64>,
     pub enabled: bool,
+    /// JSON Schema for validating tool input parameters
+    pub params_schema: Option<serde_json::Value>,
+    /// Required parameter names (enforced even without full schema)
+    pub required_params: Option<Vec<String>>,
 }
 
 /// YAML file structure
@@ -88,6 +92,57 @@ impl ToolRegistry {
     /// Check if a tool exists
     pub fn contains(&self, name: &str) -> bool {
         self.tools.contains_key(name)
+    }
+
+    /// Validate input parameters against the tool's schema.
+    /// Returns Ok(()) if valid, Err(message) if validation fails.
+    pub fn validate_params(&self, name: &str, params: &serde_json::Value) -> Result<(), String> {
+        let tool = match self.tools.get(name) {
+            Some(t) => t,
+            None => return Err(format!("Tool '{}' not found", name)),
+        };
+
+        // 1. Check required params
+        if let Some(ref required) = tool.required_params {
+            let obj = params.as_object().ok_or("Parameters must be a JSON object")?;
+            for param_name in required {
+                if !obj.contains_key(param_name) {
+                    return Err(format!(
+                        "Missing required parameter '{}' for tool '{}'",
+                        param_name, name
+                    ));
+                }
+                // Reject null values for required params
+                if obj[param_name].is_null() {
+                    return Err(format!(
+                        "Required parameter '{}' for tool '{}' must not be null",
+                        param_name, name
+                    ));
+                }
+            }
+        }
+
+        // 2. Validate against JSON Schema if provided
+        if let Some(ref schema) = tool.params_schema {
+            // Use jsonschema crate for validation
+            match jsonschema::validate(schema, params) {
+                Ok(()) => {}
+                Err(errors) => {
+                    let msgs: Vec<String> = errors.map(|e| e.to_string()).collect();
+                    return Err(format!(
+                        "Parameter validation failed for tool '{}': {}",
+                        name, msgs.join("; ")
+                    ));
+                }
+            }
+        }
+
+        // 3. Type safety: reject unexpected top-level types
+        if !params.is_object() && !params.is_null() {
+            return Err("Parameters must be a JSON object".to_string());
+        }
+
+        Ok(())
     }
 
     /// Check per-tool rate limit (token bucket in-memory, fallback to Redis)
