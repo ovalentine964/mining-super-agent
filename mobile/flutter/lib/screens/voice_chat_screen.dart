@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/api_client.dart';
 import '../services/voice_service.dart';
+import '../services/on_device_voice.dart';
 
 /// Interactive Voice Chat — Talk to the AI like a person
 ///
@@ -28,8 +29,10 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
   final _audioRecorder = AudioRecorder();
   final _audioPlayer = AudioPlayer();
 
-  // Voice service (NVIDIA NIM cloud)
-  late VoiceService _voiceService;
+  // Voice services: on-device (offline) + cloud (NVIDIA NIM)
+  late VoiceService _cloudVoiceService;
+  final OnDeviceVoiceService _onDeviceVoice = OnDeviceVoiceService();
+  bool _onDeviceAvailable = false;
 
   // Conversation state
   final _messages = <Map<String, dynamic>>[];
@@ -58,7 +61,9 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
   @override
   void initState() {
     super.initState();
-    _voiceService = VoiceService(nvidiaApiKey: 'YOUR_NVIDIA_API_KEY');
+    _cloudVoiceService = VoiceService(nvidiaApiKey: 'YOUR_NVIDIA_API_KEY');
+    // Try to initialize on-device model
+    _onDeviceAvailable = await _onDeviceVoice.initialize();
 
     // Pulse animation for listening indicator
     _pulseController = AnimationController(
@@ -395,8 +400,13 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
       if (path != null && File(path).existsSync()) {
         setState(() { _processing = true; });
 
-        // Step 1: Transcribe (NVIDIA NIM Whisper)
-        final transcript = await _voiceService.transcribe(path);
+        // Step 1: Transcribe — on-device first, cloud fallback
+        String transcript;
+        if (_onDeviceAvailable) {
+          transcript = await _onDeviceVoice.transcribe(path);
+        } else {
+          transcript = await _cloudVoiceService.transcribe(path);
+        }
         setState(() {
           _currentTranscript = transcript;
           _messages.add({
