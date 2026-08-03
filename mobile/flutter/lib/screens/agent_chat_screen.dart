@@ -88,7 +88,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
           // Voice settings
           IconButton(
             icon: const Icon(Icons.settings_voice),
-            tooltip': 'Mipangilio ya Sauti (Voice Settings)',
+            tooltip: 'Mipangilio ya Sauti (Voice Settings)',
             onPressed: _showVoiceSettings,
           ),
         ],
@@ -201,7 +201,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.camera_alt, color: Color(0xFF8B6914)),
-                        tooltip': 'Tuma Picha (Send Photo)',
+                        tooltip: 'Tuma Picha (Send Photo)',
                         onPressed: _pickAndSendPhoto,
                       ),
                     ),
