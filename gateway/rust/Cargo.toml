@@ -1,25 +1,71 @@
 [package]
-name = "mining-super-agent"
+name = "sovereign-resource-dao"
 version = "1.0.0"
 edition = "2021"
+description = "Sovereign Resource DAO — Institutional-grade Rust gateway for blockchain indexing, oracle services, real-time WebSocket, and audit logging"
 
 [dependencies]
+# Web framework
 actix-web = "4"
 actix-rt = "2"
 actix-cors = "0.7"
 actix-web-lab = "0.20"
+actix-web-actors = "4"
+actix-ws = "0.3"
+
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
+
+# Async runtime
 tokio = { version = "1", features = ["full"] }
+
+# Database
 sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+
+# Cache
 redis = { version = "0.25", features = ["tokio-comp"] }
+
+# HTTP client
 reqwest = { version = "0.12", features = ["json"] }
+
+# Authentication
 jsonwebtoken = "9"
+
+# IDs
 uuid = { version = "1", features = ["v4"] }
+
+# Time
 chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-actix-web = "0.7"
+
+# Concurrency
 dashmap = "5"
+
+# Error handling
 anyhow = "1"
+
+# Blockchain (NEW — Institutional grade)
+ethers = "2.0"
+hex = "0.4"
+
+# Cryptography (NEW — Audit trail)
+sha2 = "0.10"
+
+# Metrics (NEW — Prometheus)
+prometheus = "0.13"
+
+# Hex encoding
+hex-literal = "0.4"
+
+[features]
+default = ["full"]
+full = ["blockchain", "websocket", "audit"]
+blockchain = []
+websocket = []
+audit = []

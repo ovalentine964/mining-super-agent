@@ -1,5 +1,6 @@
 mod config;
 mod db;
+mod oracle;
 mod tools;
 
 use actix_cors::Cors;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub db: Database,
     pub redis: redis::aio::ConnectionManager,
     pub tools: tools::ToolRegistry,
+    pub oracle: Option<Arc<oracle::OracleState>>,
 }
 
 #[actix_web::main]
@@ -51,11 +53,32 @@ async fn main() -> std::io::Result<()> {
     let tools = tools::ToolRegistry::from_config(&config.tools_config_path);
     info!("Loaded {} tools", tools.len());
 
+    // Initialize oracle service (optional — requires ORACLE_PRIVATE_KEY)
+    let oracle_state = match oracle::OracleConfig::from_env() {
+        Ok(oracle_config) => {
+            match oracle::client::OracleService::new(oracle_config).await {
+                Ok(service) => {
+                    info!("Polygon oracle service initialized");
+                    Some(Arc::new(oracle::OracleState { service }))
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to initialize oracle service");
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            info!(reason = %e, "Oracle service not configured — skipping");
+            None
+        }
+    };
+
     let state = Arc::new(AppState {
         config: config.clone(),
         db,
         redis,
         tools,
+        oracle: oracle_state,
     });
 
     HttpServer::new(move || {
@@ -94,6 +117,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/v1")
                     .wrap(from_fn(auth::jwt_middleware))
                     .configure(tools::configure_routes)
+                    .configure(oracle::configure_routes)
             )
     })
     .bind(&bind_addr)?
