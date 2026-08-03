@@ -87,6 +87,10 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, AccessControl {
         uint256 vestingDuration,
         bool revocable
     ) external onlyRole(VESTING_ADMIN) {
+        require(beneficiary != address(0), "Zero address beneficiary"); // H-4 fix
+        require(amount > 0, "Zero amount"); // H-4 fix
+        require(vestingDuration > 0, "Zero vesting duration"); // H-4 fix
+        require(vestingDuration >= cliffDuration, "Cliff exceeds vesting duration"); // H-4 fix
         require(vestingSchedules[beneficiary].totalAmount == 0, "Already vested");
         require(totalMinted + amount <= MAX_SUPPLY, "Exceeds max supply");
 

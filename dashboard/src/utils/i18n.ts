@@ -51,7 +51,7 @@ const translations: Record<string, Record<Lang, string>> = {
   'fairness.score': { en: 'Fairness Score', sw: 'Alama ya Usawa' },
   'fairness.excellent': { en: 'Excellent', sw: 'Bora Sana' },
   'fairness.good': { en: 'Good', sw: 'Nzuri' },
-  'fairness.fair': { en: 'Fair', wastani },
+  'fairness.fair': { en: 'Fair', sw: 'Wastani' },
   'fairness.poor': { en: 'Poor', sw: 'Dhaifu' },
 
   // Satellite Alerts

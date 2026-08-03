@@ -199,6 +199,47 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ─── Rust Gateway (high-performance API layer) ──────────────
+  gateway:
+    build:
+      context: ./gateway/rust
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - internal
+      - external
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mining}:${DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-mining}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET_KEY}
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      GATEWAY_PORT: "8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ─── Caddy (reverse proxy, auto-TLS, HSTS) ──────────────────
   caddy:
     image: caddy:2-alpine

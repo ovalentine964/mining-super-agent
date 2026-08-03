@@ -52,6 +52,9 @@ contract RoyaltyDistributor is
         RECOVERY            // Recovered unpaid royalties (from legal action)
     }
 
+    // M-5 fix: pending withdrawals fallback for failed transfers
+    mapping(address => uint256) public pendingWithdrawals;
+
     // Tracking
     uint256 public totalDistributed;
     uint256 public lastDistributionTimestamp;
@@ -92,6 +95,10 @@ contract RoyaltyDistributor is
         __AccessControl_init();
         __ReentrancyGuard_init();
 
+        require(_communityDevelopmentFund != address(0), "Zero address: dev fund"); // H-3 fix
+        require(_communityWallet != address(0), "Zero address: community wallet"); // H-3 fix
+        require(_protocolReserve != address(0), "Zero address: reserve"); // H-3 fix
+
         communityDevelopmentFund = _communityDevelopmentFund;
         communityWallet = _communityWallet;
         protocolReserve = _protocolReserve;
@@ -119,15 +126,22 @@ contract RoyaltyDistributor is
         distributionCount++;
         lastDistributionTimestamp = block.timestamp;
 
-        // Transfer shares — atomic, all-or-nothing
+        // M-5 fix: try/catch pattern with pendingWithdrawals fallback
+        // Transfer shares — non-blocking, bad destination doesn't block others
         (bool devOk, ) = communityDevelopmentFund.call{value: devShare}("");
-        require(devOk, "Dev fund transfer failed");
+        if (!devOk) {
+            pendingWithdrawals[communityDevelopmentFund] += devShare;
+        }
 
         (bool walletOk, ) = communityWallet.call{value: walletShare}("");
-        require(walletOk, "Community wallet transfer failed");
+        if (!walletOk) {
+            pendingWithdrawals[communityWallet] += walletShare;
+        }
 
         (bool reserveOk, ) = protocolReserve.call{value: reserveShare}("");
-        require(reserveOk, "Reserve transfer failed");
+        if (!reserveOk) {
+            pendingWithdrawals[protocolReserve] += reserveShare;
+        }
 
         emit RevenueDistributed(
             msg.sender, source, msg.value,
@@ -153,21 +167,24 @@ contract RoyaltyDistributor is
         emit SplitPercentagesUpdated(newDevBps, newWalletBps, newReserveBps, block.timestamp);
     }
 
-    /// @notice Update destination wallets (DAO-only)
+    /// @notice Update destination wallets (DAO-only) (H-3 fix: zero address validation)
     function updateDestinations(
         address _devFund,
         address _communityWallet,
         address _reserve
     ) external onlyRole(DAO_ROLE) {
         if (_devFund != address(0)) {
+            require(_devFund != address(0), "Zero address: dev fund");
             communityDevelopmentFund = _devFund;
             emit DestinationUpdated(_devFund, "development", block.timestamp);
         }
         if (_communityWallet != address(0)) {
+            require(_communityWallet != address(0), "Zero address: community wallet");
             communityWallet = _communityWallet;
             emit DestinationUpdated(_communityWallet, "community", block.timestamp);
         }
         if (_reserve != address(0)) {
+            require(_reserve != address(0), "Zero address: reserve");
             protocolReserve = _reserve;
             emit DestinationUpdated(_reserve, "reserve", block.timestamp);
         }
@@ -189,6 +206,15 @@ contract RoyaltyDistributor is
         uint256 lastTimestamp
     ) {
         return (totalDistributed, distributionCount, lastDistributionTimestamp);
+    }
+
+    /// @notice Withdraw pending funds after a failed distribution (M-5 fix)
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "No pending withdrawal");
+        pendingWithdrawals[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amount}("");
+        require(ok, "Withdraw failed");
     }
 
     // UUPS authorization — only DAO can upgrade

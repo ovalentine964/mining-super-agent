@@ -15,6 +15,26 @@ from typing import Any
 
 import numpy as np
 
+
+def _npv(rate: float, cash_flows: list[float]) -> float:
+    """Calculate Net Present Value (replaces removed np.npv)."""
+    return sum(cf / (1 + rate) ** t for t, cf in enumerate(cash_flows))
+
+
+def _irr(cash_flows: list[float], tol: float = 1e-8, max_iter: int = 1000) -> float | None:
+    """Calculate Internal Rate of Return via bisection (replaces removed np.irr)."""
+    low, high = -0.5, 5.0
+    for _ in range(max_iter):
+        mid = (low + high) / 2
+        npv_mid = _npv(mid, cash_flows)
+        if abs(npv_mid) < tol:
+            return mid
+        if npv_mid > 0:
+            low = mid
+        else:
+            high = mid
+    return None  # Did not converge
+
 logger = logging.getLogger(__name__)
 
 # Financial disclaimers
@@ -50,12 +70,12 @@ async def calculate_npv(
     for year in range(1, mine_life_years + 1):
         cash_flows.append(annual_profit)
     
-    npv = np.npv(discount_rate, cash_flows)
+    npv = _npv(discount_rate, cash_flows)
     
     # Calculate IRR
     try:
-        irr = np.irr(cash_flows)
-    except:
+        irr = _irr(cash_flows)
+    except Exception:
         irr = None  # IRR may not converge
     
     # Calculate payback period
@@ -76,7 +96,7 @@ async def calculate_npv(
         adjusted_revenue = effective_production * adjusted_price
         adjusted_profit = adjusted_revenue - opex_annual
         adjusted_flows = [-capex] + [adjusted_profit] * mine_life_years
-        adjusted_npv = np.npv(discount_rate, adjusted_flows)
+        adjusted_npv = _npv(discount_rate, adjusted_flows)
         sensitivity[f"price_{int(price_change*100)}%"] = round(adjusted_npv, 2)
     
     return {

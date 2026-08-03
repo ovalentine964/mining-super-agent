@@ -134,6 +134,7 @@ contract ExtractionTracker is ERC721URIStorage, AccessControl {
     ) external onlyRole(ORACLE_ROLE) {
         ExtractionRecord storage record = records[recordId];
         require(record.submitter != address(0), "Record does not exist");
+        require(record.status == VerificationStatus.UNVERIFIED, "Already processed");
 
         if (isValid) {
             record.status = VerificationStatus.ORACLE_VERIFIED;
@@ -162,13 +163,14 @@ contract ExtractionTracker is ERC721URIStorage, AccessControl {
         // Note: Soulbound — no transfer, just status update
     }
 
-    /// @notice Dispute an extraction record
+    /// @notice Dispute an extraction record (H-1 fix: added access control + state checks)
     function disputeExtraction(
         uint256 recordId,
         string calldata reason
-    ) external {
+    ) external onlyRole(VERIFIER_ROLE) {
         ExtractionRecord storage record = records[recordId];
         require(record.submitter != address(0), "Record does not exist");
+        require(record.status != VerificationStatus.DISPUTED, "Already disputed");
 
         record.status = VerificationStatus.DISPUTED;
         disputedRecords++;
@@ -197,6 +199,11 @@ contract ExtractionTracker is ERC721URIStorage, AccessControl {
         uint256 disputed
     ) {
         return (totalRecords, verifiedRecords, disputedRecords);
+    }
+
+    /// @notice Override setTokenURI with access control (C-1 fix)
+    function setTokenURI(uint256 tokenId, string memory _tokenURI) public override onlyRole(TRACKER_ADMIN) {
+        super.setTokenURI(tokenId, _tokenURI);
     }
 
     // Soulbound — override transfer functions to prevent transfers

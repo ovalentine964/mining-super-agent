@@ -307,6 +307,22 @@ h3 { font-size: 1.2rem; font-weight: 700; }
     .steps { flex-direction: column; align-items: center; gap: 24px; }
 }
 
+/* ===== PROBLEM (Real Exploitation Data) ===== */
+.problem-section {
+    padding: 80px 0;
+    background: linear-gradient(180deg, var(--bg) 0%, #1a0a0a 100%);
+    border-bottom: 1px solid #3a1a1a;
+}
+.problem-section .stat-value {
+    background: linear-gradient(135deg, #e17055, #fdcb6e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.problem-section .stat-label {
+    color: #cc8888;
+}
+
 /* ===== STATS ===== */
 .stats-section {
     padding: 80px 0;

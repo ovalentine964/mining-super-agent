@@ -31,13 +31,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install ruff mypy pytest pytest-cov
-          pip install -r requirements-bot.txt || true
+          pip install -r requirements-bot.txt
 
       - name: Lint (ruff)
-        run: ruff check src/ tests/ --ignore-missing-imports || true
+        run: ruff check src/ tests/ --ignore-missing-imports
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short || true
+        run: pytest tests/ -v --tb=short
 
   # ──────────────────────────────────────────────
   # Rust — build & test
@@ -62,10 +62,10 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build (release)
-        run: cargo build --release 2>&1 || echo "Build completed with warnings"
+        run: cargo build --release
 
       - name: Run tests
-        run: cargo test 2>&1 || echo "Tests completed with warnings"
+        run: cargo test
 
   # ──────────────────────────────────────────────
   # Flutter — build APK
@@ -95,19 +95,19 @@ jobs:
           cache: true
 
       - name: Accept Android licenses
-        run: yes | sdkmanager --licenses || true
+        run: yes | sdkmanager --licenses
 
       - name: Install NDK (for whisper.cpp native build)
-        run: sdkmanager "ndk;25.2.9519653" || true
+        run: sdkmanager "ndk;25.2.9519653"
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze || true
+        run: flutter analyze
 
       - name: Run tests
-        run: flutter test || true
+        run: flutter test
 
       - name: Build APK (release, all ABIs)
         run: flutter build apk --release
@@ -121,7 +121,7 @@ jobs:
           if-no-files-found: error
 
   # ──────────────────────────────────────────────
-  # Smart Contracts — compile
+  # Smart Contracts — compile & test
   # ──────────────────────────────────────────────
   contracts-build:
     runs-on: ubuntu-latest
@@ -142,4 +142,4 @@ jobs:
         run: npx hardhat compile
 
       - name: Run tests
-        run: npx hardhat test || true
+        run: npx hardhat test

@@ -62,8 +62,6 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
   void initState() {
     super.initState();
     _cloudVoiceService = VoiceService(nvidiaApiKey: 'YOUR_NVIDIA_API_KEY');
-    // Try to initialize on-device model
-    _onDeviceAvailable = await _onDeviceVoice.initialize();
 
     // Pulse animation for listening indicator
     _pulseController = AnimationController(
@@ -74,6 +72,12 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _initAsync();
+  }
+
+  Future<void> _initAsync() async {
+    // Try to initialize on-device model
+    _onDeviceAvailable = await _onDeviceVoice.initialize();
     _initVoice();
   }
 

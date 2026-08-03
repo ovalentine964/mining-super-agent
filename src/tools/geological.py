@@ -402,8 +402,8 @@ async def analyze_deposit_model(
 def register_geological_tools(registry) -> None:
     """Register all geological tools with the tool registry."""
     registry.register_handler("gempy_3d_model", gempy_3d_model)
-    registry.register_handler("run_geophysical_inversion", simpeg_inversion)
-    registry.register_handler("query_mindat", mindat_query)
+    registry.register_handler("simpeg_inversion", simpeg_inversion)
+    registry.register_handler("mindat_query", mindat_query)
     registry.register_handler("usgs_mrdata_query", usgs_mrdata_query)
-    registry.register_handler("query_geological_database", geological_database_query)
+    registry.register_handler("geological_database_query", geological_database_query)
     registry.register_handler("analyze_deposit_model", analyze_deposit_model)

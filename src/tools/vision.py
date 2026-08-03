@@ -65,7 +65,7 @@ async def identify_mineral_from_photo(
     - Economic minerals flagged for expert review
     """
     from ..ml.mineral_classifier import MineralClassifier
-    from ..ml.clip_classifier import CLIPClassifier
+    from ..ml.clip_classifier import CLIPMineralClassifier
     
     # Try EfficientNet first
     classifier = MineralClassifier()
@@ -74,7 +74,7 @@ async def identify_mineral_from_photo(
     # CRITICAL: Pyrite must NEVER be gold
     if result.mineral == "gold":
         # Double-check with CLIP
-        clip = CLIPClassifier()
+        clip = CLIPMineralClassifier()
         clip_result = clip.classify(image_bytes)
         if clip_result.top_class in ("pyrite", "chalcopyrite"):
             # Override — this is likely pyrite, not gold

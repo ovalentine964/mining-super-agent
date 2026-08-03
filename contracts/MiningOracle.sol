@@ -36,6 +36,7 @@ contract MiningOracle is AccessControl {
     mapping(bytes32 => bool) public locationVerified;
     mapping(bytes32 => uint256) public submissionCount;
     mapping(address => bool) public activeOracles;
+    mapping(bytes32 => mapping(address => bool)) public hasSubmitted; // C-2 fix: per-oracle-per-location duplicate prevention
 
     // Consensus threshold
     uint256 public requiredConfirmations = 2;
@@ -68,6 +69,8 @@ contract MiningOracle is AccessControl {
     ) external onlyRole(ORACLE_ROLE) {
         require(confidenceBps <= 10000, "Confidence exceeds 100%");
         require(!locationVerified[locationHash], "Already verified");
+        require(!hasSubmitted[locationHash][msg.sender], "Already submitted"); // C-2 fix
+        hasSubmitted[locationHash][msg.sender] = true; // C-2 fix
 
         submissions[locationHash].push(OracleSubmission({
             locationHash: locationHash,
@@ -137,7 +140,7 @@ contract MiningOracle is AccessControl {
 
     /// @notice Update required confirmations (admin only)
     function setRequiredConfirmations(uint256 _required) external onlyRole(ORACLE_ADMIN) {
-        require(_required >= 1, "Must require at least 1");
+        require(_required >= 2, "Minimum 2 confirmations required"); // M-2 fix
         requiredConfirmations = _required;
     }
 }

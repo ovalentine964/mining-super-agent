@@ -21,8 +21,9 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 
 # Import all components
 from src.agents import list_agents, get_agent
@@ -34,12 +35,29 @@ from src.channels import get_registry, register_default_channels
 
 logger = logging.getLogger(__name__)
 
+# Singleton agent — created once at startup, reused for all requests
+_agent_instance = None
+
+
+def get_agent_instance():
+    """Get or create the singleton SovereignResourceDAO agent."""
+    global _agent_instance
+    if _agent_instance is None:
+        from src.superagent import SovereignResourceDAO
+        _agent_instance = SovereignResourceDAO()
+    return _agent_instance
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
+    global _agent_instance
     logger.info("Sovereign Resource DAO starting...")
     logger.info("Agents loaded: %d", len(list_agents()))
+
+    # Pre-create the agent singleton (saves 5-15ms per request)
+    _agent_instance = get_agent_instance()
+    logger.info("Super-agent initialized (singleton)")
 
     # Register and start messaging channels (Telegram, etc.)
     await register_default_channels()
@@ -59,6 +77,18 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# ── API Key Auth (optional, enabled via API_KEY env var) ───────────────────
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+_REQUIRED_API_KEY = os.environ.get("API_KEY", "")
+
+
+async def verify_api_key(api_key: str | None = Depends(_api_key_header)):
+    """Require API key if API_KEY env var is set. Otherwise allow all."""
+    if _REQUIRED_API_KEY and api_key != _REQUIRED_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return True
 
 # ── Routers ────────────────────────────────────────────────────────────────
 
@@ -82,10 +112,9 @@ async def route_channel_message(payload: dict):
 
     logger.info("Routing %s message from %s via %s", message_type, sender, source)
 
-    # Try to get a response from the super-agent
+    # Try to get a response from the super-agent (singleton, not per-request)
     try:
-        from src.superagent import SovereignResourceDAO
-        agent = SovereignResourceDAO()
+        agent = get_agent_instance()
         result = await agent.chat(
             user_id=sender,
             message=text or f"[{message_type} message received]",
@@ -139,9 +168,17 @@ async def active_proposals():
 
 
 # CORS — restrict in production
+_cors_origins = os.environ.get("CORS_ORIGINS", "").strip()
+if not _cors_origins or _cors_origins == "*":
+    if os.environ.get("ENV", "development") == "production":
+        raise ValueError("CORS_ORIGINS must be set in production (no wildcards)")
+    _cors_origins_list = ["http://localhost:3000", "http://localhost:5173"]  # dev defaults
+else:
+    _cors_origins_list = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=_cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -152,7 +189,9 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "sovereign-resource-dao"}
+    # Don't leak application name in production
+    is_prod = os.environ.get("ENV", "development") == "production"
+    return {"status": "healthy"} if is_prod else {"status": "healthy", "service": "sovereign-resource-dao"}
 
 
 @app.get("/status")

@@ -170,10 +170,10 @@ class MiningDeerFlowAgent:
             agent = SovereignResourceDAO()
             result = await agent.analyze(question, context)
             return {
-                "success": result.success,
-                "answer": result.summary,
-                "confidence": result.confidence,
-                "warnings": result.warnings,
+                "success": result.get("success", False),
+                "answer": result.get("response", ""),
+                "confidence": result.get("confidence", 0.0),
+                "warnings": result.get("warnings", []),
                 "fallback": True,
             }
         except Exception as e:
