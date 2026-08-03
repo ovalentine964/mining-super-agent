@@ -1,7 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#2E7D32</color>
-    <color name="primary">#2E7D32</color>
-    <color name="primary_dark">#1B5E20</color>
-    <color name="accent">#FFD700</color>
+    <!-- Sovereign Resource DAO Brand Colors -->
+
+    <!-- Primary: Gold — represents minerals, value, sovereignty -->
+    <color name="brand_gold">#8B6914</color>
+    <color name="brand_gold_light">#A67B1E</color>
+    <color name="brand_gold_dark">#6B5010</color>
+    <color name="brand_gold_highlight">#C49A2A</color>
+
+    <!-- Secondary: Dark Blue — represents technology, trust, depth -->
+    <color name="brand_dark_blue">#1A1A2E</color>
+    <color name="brand_dark_blue_light">#2A2A48</color>
+
+    <!-- Neutral -->
+    <color name="brand_white">#FFFFFF</color>
+
+    <!-- Android System Colors -->
+    <color name="ic_launcher_background">#1A1A2E</color>
+    <color name="primary">#1A1A2E</color>
+    <color name="primary_dark">#0F0F1E</color>
+    <color name="accent">#8B6914</color>
+    <color name="splash_background">#1A1A2E</color>
 </resources>

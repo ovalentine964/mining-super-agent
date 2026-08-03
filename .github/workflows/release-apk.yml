@@ -31,6 +31,8 @@ jobs:
       HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Resolve tag
         id: tag
@@ -46,8 +48,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK & NDK
         uses: android-actions/setup-android@v3
+
+      - name: Install NDK (for whisper.cpp native build)
+        run: sdkmanager "ndk;25.2.9519653" || true
 
       - uses: subosito/flutter-action@v2
         with:

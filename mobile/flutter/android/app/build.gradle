@@ -55,25 +55,29 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
-
-        // ── whisper.cpp native build via CMake ──────────────────────
-        externalNativeBuild {
-            cmake {
-                cppFlags "-O3 -DNDEBUG -std=c++17"
-                arguments "-DANDROID_STL=c++_shared",
-                          "-DWHISPER_BUILD_TESTS=OFF",
-                          "-DWHISPER_BUILD_EXAMPLES=OFF"
-                // Build only the ABIs we actually ship
-                abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
-            }
-        }
     }
 
-    // Point CMake at the whisper.cpp source tree
-    externalNativeBuild {
-        cmake {
-            path "src/main/cpp/CMakeLists.txt"
-            version "3.22.1"
+    // ── whisper.cpp native build via CMake (optional) ────────────────
+    // Only enabled when the whisper.cpp source tree is present.
+    // To enable: clone whisper.cpp into src/main/cpp/whisper.cpp/
+    def whisperDir = file("src/main/cpp/whisper.cpp")
+    if (whisperDir.exists()) {
+        defaultConfig {
+            externalNativeBuild {
+                cmake {
+                    cppFlags "-O3 -DNDEBUG -std=c++17"
+                    arguments "-DANDROID_STL=c++_shared",
+                              "-DWHISPER_BUILD_TESTS=OFF",
+                              "-DWHISPER_BUILD_EXAMPLES=OFF"
+                    abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+                }
+            }
+        }
+        externalNativeBuild {
+            cmake {
+                path "src/main/cpp/CMakeLists.txt"
+                version "3.22.1"
+            }
         }
     }
 
