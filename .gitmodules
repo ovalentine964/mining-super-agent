@@ -1,3 +1,0 @@
-[submodule "mining-super-agent/vendor/deerflow"]
-	path = mining-super-agent/vendor/deerflow
-	url = https://github.com/bytedance/deer-flow.git

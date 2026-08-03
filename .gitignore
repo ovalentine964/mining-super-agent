@@ -1,7 +1,4 @@
-# Environment
-.env
-.env.local
-.env.*.local
+# Sovereign Resource DAO — .gitignore
 
 # Python
 __pycache__/
@@ -9,24 +6,50 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 .venv/
 venv/
 env/
 
-# Node
-node_modules/
-npm-debug.log*
+# Rust
+gateway/rust/target/
+gateway/rust/Cargo.lock
 
 # Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-build/
-*.apk
-*.aab
+mobile/flutter/.dart_tool/
+mobile/flutter/.packages
+mobile/flutter/build/
+mobile/flutter/.flutter-plugins
+mobile/flutter/.flutter-plugins-dependencies
+mobile/flutter/pubspec.lock
 
-# Docker
-.docker/
+# Node.js (smart contracts)
+contracts/node_modules/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/deployment-addresses.json
+
+# Environment
+.env
+.env.local
+.env.production
+*.pem
+*.key
 
 # IDE
 .vscode/
@@ -41,14 +64,25 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
-# Temporary
-.tmp/
-tmp/
-.openclaw/tmp/
+# Data
+*.db
+*.sqlite
+*.sqlite3
 
-# Sensitive
-*.pem
-*.key
-*.cert
-tokens.json
+# Backups
+backups/
+
+# Docker volumes
+docker-data/
+
+# Council reports (keep in repo for reference)
+# council_reports/  # Uncomment to exclude
+
+# Validation/proof (keep for reference)
+# validation/
+# proof/
+
+# Original codebase (integrated, no longer needed)
+mining-super-agent/

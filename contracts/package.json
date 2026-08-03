@@ -1,0 +1,22 @@
+{
+  "name": "sovereign-resource-dao-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for the Sovereign Resource DAO — community-owned mineral intelligence",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:mumbai": "npx hardhat run scripts/deploy.js --network mumbai",
+    "deploy:polygon": "npx hardhat run scripts/deploy.js --network polygon",
+    "verify": "npx hardhat verify --network polygon"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.0.0"
+  }
+}
