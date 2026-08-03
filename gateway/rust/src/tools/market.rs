@@ -54,15 +54,21 @@ pub async fn get_price(
                         "source": "finnhub",
                         "data": data
                     })),
-                    Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                        "error": "parse_error",
-                        "message": e.to_string()
-                    })),
+                    Err(e) => {
+                        tracing::error!("Finnhub response parse error: {}", e);
+                        HttpResponse::BadGateway().json(serde_json::json!({
+                            "error": "parse_error",
+                            "message": "Invalid response from market data provider"
+                        }))
+                    }
                 },
-                Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                    "error": "api_error",
-                    "message": e.to_string()
-                })),
+                Err(e) => {
+                    tracing::error!("Finnhub API error: {}", e);
+                    HttpResponse::BadGateway().json(serde_json::json!({
+                        "error": "api_error",
+                        "message": "Market data service is temporarily unavailable"
+                    }))
+                }
             }
         }
         _ => {
@@ -71,15 +77,21 @@ pub async fn get_price(
             match client.get(&url).query(&[("symbol", query.symbol.as_str())]).send().await {
                 Ok(resp) => match resp.json::<serde_json::Value>().await {
                     Ok(data) => HttpResponse::Ok().json(data),
-                    Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                        "error": "parse_error",
-                        "message": e.to_string()
-                    })),
+                    Err(e) => {
+                        tracing::error!("Market data service parse error: {}", e);
+                        HttpResponse::BadGateway().json(serde_json::json!({
+                            "error": "parse_error",
+                            "message": "Invalid response from market data service"
+                        }))
+                    }
                 },
-                Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                    "error": "service_unavailable",
-                    "message": format!("Market data service unreachable: {}", e)
-                })),
+                Err(e) => {
+                    tracing::error!("Market data service unreachable: {}", e);
+                    HttpResponse::BadGateway().json(serde_json::json!({
+                        "error": "service_unavailable",
+                        "message": "Market data service is temporarily unavailable"
+                    }))
+                }
             }
         }
     }
@@ -108,15 +120,21 @@ pub async fn get_history(
     {
         Ok(resp) => match resp.json::<serde_json::Value>().await {
             Ok(data) => HttpResponse::Ok().json(data),
-            Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                "error": "parse_error",
-                "message": e.to_string()
-            })),
+            Err(e) => {
+                tracing::error!("Market history parse error: {}", e);
+                HttpResponse::BadGateway().json(serde_json::json!({
+                    "error": "parse_error",
+                    "message": "Invalid response from market data service"
+                }))
+            }
         },
-        Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-            "error": "service_unavailable",
-            "message": format!("Market data service unreachable: {}", e)
-        })),
+        Err(e) => {
+            tracing::error!("Market history service unreachable: {}", e);
+            HttpResponse::BadGateway().json(serde_json::json!({
+                "error": "service_unavailable",
+                "message": "Market data service is temporarily unavailable"
+            }))
+        }
     }
 }
 
@@ -137,15 +155,21 @@ pub async fn forecast(
     {
         Ok(resp) => match resp.json::<serde_json::Value>().await {
             Ok(result) => HttpResponse::Ok().json(result),
-            Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                "error": "invalid_response",
-                "message": e.to_string()
-            })),
+            Err(e) => {
+                tracing::error!("Forecast service invalid response: {}", e);
+                HttpResponse::BadGateway().json(serde_json::json!({
+                    "error": "invalid_response",
+                    "message": "Invalid response from forecast service"
+                }))
+            }
         },
-        Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-            "error": "service_unavailable",
-            "message": format!("Forecast service unreachable: {}", e)
-        })),
+        Err(e) => {
+            tracing::error!("Forecast service unreachable: {}", e);
+            HttpResponse::BadGateway().json(serde_json::json!({
+                "error": "service_unavailable",
+                "message": "Forecast service is temporarily unavailable"
+            }))
+        }
     }
 }
 
@@ -168,21 +192,34 @@ pub async fn call_service(
             symbol, api_key
         );
         let resp = client.get(&url).send().await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .map_err(|e| {
+                tracing::error!("Finnhub HTTP error ({}): {}", endpoint, e);
+                "Service temporarily unavailable".to_string()
+            })?;
         resp.json::<serde_json::Value>().await
-            .map_err(|e| format!("JSON parse error: {}", e))
+            .map_err(|e| {
+                tracing::error!("Finnhub JSON parse error: {}", e);
+                "Invalid response from market data provider".to_string()
+            })
     } else {
         let url = format!("{}{}", config.deerflow_url, endpoint);
         let resp = client.post(&url).json(body)
             .timeout(std::time::Duration::from_secs(120))
             .send().await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .map_err(|e| {
+                tracing::error!("Market service HTTP error ({}): {}", endpoint, e);
+                "Service temporarily unavailable".to_string()
+            })?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(format!("Service returned {}: {}", status, text));
+            tracing::error!("Market service returned {} at {}: {}", status, endpoint, text);
+            return Err(format!("Service error (HTTP {})", status));
         }
         resp.json::<serde_json::Value>().await
-            .map_err(|e| format!("JSON parse error: {}", e))
+            .map_err(|e| {
+                tracing::error!("Market service JSON parse error: {}", e);
+                "Invalid response from market data service".to_string()
+            })
     }
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import '../services/api_client.dart';
 
 class PhotoScreen extends StatefulWidget {
   const PhotoScreen({super.key});
@@ -15,6 +16,7 @@ class _PhotoScreenState extends State<PhotoScreen> {
   Position? _position;
   bool _loading = false;
   String? _result;
+  final _apiClient = ApiClient();
 
   Future<void> _takePhoto() async {
     final picker = ImagePicker();
@@ -37,12 +39,44 @@ class _PhotoScreenState extends State<PhotoScreen> {
       // GPS not available
     }
 
-    // TODO: Send to API for analysis
-    setState(() {
-      _loading = false;
-      _result = 'Mineral identification will appear here.\n\n'
-          'Photo captured. ${_position != null ? "GPS: ${_position!.latitude}, ${_position!.longitude}" : "No GPS signal."}';
-    });
+    // Send photo to backend for mineral identification
+    try {
+      final result = await _apiClient.uploadFile(
+        '/api/v1/minerals/identify',
+        _image!.path,
+        fieldName: 'image',
+        fields: {
+          if (_position != null) 'latitude': _position!.latitude.toString(),
+          if (_position != null) 'longitude': _position!.longitude.toString(),
+          'method': 'photo',
+        },
+        timeout: const Duration(seconds: 60),
+      );
+
+      final mineral = result['mineral'] ?? 'unknown';
+      final confidence = result['confidence'] ?? 0;
+      final disclaimers = (result['disclaimers'] as List<dynamic>?)?.join('\n') ?? '';
+      final lookAlikes = (result['look_alikes'] as List<dynamic>?)?.join(', ') ?? 'none';
+      final swahiliSummary = result['swahili_summary'] ?? '';
+      final requiresExpert = result['requires_expert_review'] == true;
+
+      setState(() {
+        _loading = false;
+        _result = '🪨 Mineral: ${mineral.toString().toUpperCase()}\n'
+            '📊 Confidence: ${(confidence * 100).toStringAsFixed(0)}%\n'
+            '${_position != null ? "📍 GPS: ${_position!.latitude}, ${_position!.longitude}\n" : ""}'
+            '🔍 Look-alikes: $lookAlikes\n'
+            '${requiresExpert ? "⚠️ Requires expert review\n" : ""}'
+            '\n$swahiliSummary\n\n'
+            '$disclaimers';
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _result = '❌ Analysis failed: $e\n\n'
+            'Photo captured. ${_position != null ? "GPS: ${_position!.latitude}, ${_position!.longitude}" : "No GPS signal."}';
+      });
+    }
   }
 
   @override

@@ -8,6 +8,10 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/api_client.dart';
 import '../services/voice_service.dart';
 
+/// NVIDIA API key from compile-time define.
+/// Pass via: flutter run --dart-define=NVIDIA_API_KEY=your_key
+const _nvidiaApiKey = String.fromEnvironment( 'NVIDIA_API_KEY', defaultValue: '');
+
 /// Agent Chat Screen — Talk to the five sovereign agents
 /// Supports TEXT and VOICE input (record → transcribe → respond)
 class AgentChatScreen extends StatefulWidget {
@@ -45,7 +49,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
   void initState() {
     super.initState();
     // Initialize with env var or default — user sets in settings
-    _voiceService = VoiceService(nvidiaApiKey: 'YOUR_NVIDIA_API_KEY');
+    _voiceService = VoiceService(nvidiaApiKey: _nvidiaApiKey);
     _initRecorder();
   }
 
@@ -332,6 +336,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
           'content': result['response'] ?? result['note'] ?? 'No response',
           'time': _currentTime(),
         });
+        _loading = false;
       });
     } catch (e) {
       setState(() {
@@ -340,9 +345,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
           'content': 'Hitilafu: $e\nError: $e',
           'time': _currentTime(),
         });
+        _loading = false;
       });
-    } finally {
-      setState(() { _loading = false; });
     }
   }
 
@@ -373,11 +377,10 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     try {
       final path = await _audioRecorder.stop();
 
-      setState(() { _recording = false; });
-
       if (path != null && File(path).existsSync()) {
         // Add user voice message
         setState(() {
+          _recording = false;
           _messages.add({
             'role': 'user',
             'content': '🎤 Ujumbe wa sauti...',
@@ -422,6 +425,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
               'audio_path': audioPath,
               'time': _currentTime(),
             });
+            _loading = false;
           });
         } catch (e) {
           setState(() {
@@ -430,10 +434,11 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
               'content': 'Hitilafu ya sauti: $e\nVoice error: $e',
               'time': _currentTime(),
             });
+            _loading = false;
           });
-        } finally {
-          setState(() { _loading = false; });
         }
+      } else {
+        setState(() { _recording = false; });
       }
     } catch (e) {
       setState(() {
@@ -466,7 +471,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
         setState(() { _playingAudio = true; });
         await _audioPlayer.play(DeviceFileSource(path));
         _audioPlayer.onPlayerComplete.listen((_) {
-          setState(() { _playingAudio = false; });
+          if (mounted) setState(() { _playingAudio = false; });
         });
       }
     } catch (e) {

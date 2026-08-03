@@ -178,8 +178,34 @@ contract ExtractionTracker is ERC721URIStorage, AccessControl {
         emit ExtractionDisputed(recordId, msg.sender, reason);
     }
 
-    /// @notice Get all records for a location
+    /// @notice Get paginated records for a location
+    /// @param locationHash The location to query
+    /// @param offset Starting index (0-based)
+    /// @param limit Maximum number of records to return (max 100)
     function getLocationRecords(
+        bytes32 locationHash,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (uint256[] memory recordIds, uint256 total) {
+        uint256[] storage allRecords = locationRecords[locationHash];
+        total = allRecords.length;
+
+        // Clamp limit to prevent excessive gas usage
+        if (limit > 100) limit = 100;
+        if (offset >= total) return (new uint256[](0), total);
+
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+
+        uint256[] memory result = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            result[i - offset] = allRecords[i];
+        }
+        return (result, total);
+    }
+
+    /// @notice Backward-compatible: get all records for a location (use with caution)
+    function getLocationRecordsAll(
         bytes32 locationHash
     ) external view returns (uint256[] memory) {
         return locationRecords[locationHash];

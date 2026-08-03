@@ -59,26 +59,34 @@ async def yfinance_price(commodity: str, currency: str = "USD") -> dict[str, Any
         return {"success": False, "error": f"Unknown commodity: {commodity}"}
 
     try:
-        import yfinance as yf
+        import asyncio
 
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
+        def _fetch_yfinance():
+            import yfinance as yf
 
-        price = info.get("regularMarketPrice") or info.get("previousClose")
-        if not price:
-            # Try fast_info
-            price = ticker.fast_info.get("last_price", 0)
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
 
-        if price:
-            result = {
-                "success": True,
-                "commodity": commodity,
-                "symbol": symbol,
-                "price_usd": float(price),
-                "currency": currency,
-                "source": "yfinance",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
+            price = info.get("regularMarketPrice") or info.get("previousClose")
+            if not price:
+                # Try fast_info
+                price = ticker.fast_info.get("last_price", 0)
+
+            if price:
+                return {
+                    "success": True,
+                    "commodity": commodity,
+                    "symbol": symbol,
+                    "price_usd": float(price),
+                    "currency": currency,
+                    "source": "yfinance",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+
+            return None
+
+        result = await asyncio.to_thread(_fetch_yfinance)
+        if result:
             _set_cached_price(cache_key, result)
             return result
 
@@ -242,43 +250,52 @@ async def price_history(
         return {"success": False, "error": f"Unknown commodity: {commodity}"}
 
     try:
-        import yfinance as yf
+        import asyncio
 
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period=period, interval=interval)
+        def _fetch_history():
+            import yfinance as yf
 
-        if hist.empty:
-            return {"success": False, "error": "No historical data available"}
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period=period, interval=interval)
 
-        data_points = [
-            {
-                "date": str(idx.date()),
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"]),
+            if hist.empty:
+                return None
+
+            data_points = [
+                {
+                    "date": str(idx.date()),
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2),
+                    "volume": int(row["Volume"]),
+                }
+                for idx, row in hist.iterrows()
+            ]
+
+            first_close = data_points[0]["close"] if data_points else 0
+            last_close = data_points[-1]["close"] if data_points else 0
+            change_pct = ((last_close - first_close) / first_close * 100) if first_close else 0
+
+            return {
+                "success": True,
+                "commodity": commodity,
+                "period": period,
+                "interval": interval,
+                "data_points": data_points,
+                "summary": {
+                    "start_price": first_close,
+                    "end_price": last_close,
+                    "change_pct": round(change_pct, 2),
+                    "trend": "up" if change_pct > 5 else "down" if change_pct < -5 else "sideways",
+                },
             }
-            for idx, row in hist.iterrows()
-        ]
 
-        first_close = data_points[0]["close"] if data_points else 0
-        last_close = data_points[-1]["close"] if data_points else 0
-        change_pct = ((last_close - first_close) / first_close * 100) if first_close else 0
+        result = await asyncio.to_thread(_fetch_history)
+        if result:
+            return result
 
-        return {
-            "success": True,
-            "commodity": commodity,
-            "period": period,
-            "interval": interval,
-            "data_points": data_points,
-            "summary": {
-                "start_price": first_close,
-                "end_price": last_close,
-                "change_pct": round(change_pct, 2),
-                "trend": "up" if change_pct > 5 else "down" if change_pct < -5 else "sideways",
-            },
-        }
+        return {"success": False, "error": "No historical data available"}
 
     except ImportError:
         return {"success": False, "error": "yfinance not installed"}

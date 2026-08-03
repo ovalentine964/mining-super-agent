@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import PriceWidget from './components/PriceWidget';
 import ExtractionTable from './components/ExtractionTable';
@@ -12,16 +13,18 @@ export default function App() {
   const [lang, setLang] = useState<Lang>('en');
 
   return (
-    <div className="app">
-      <Header lang={lang} setLang={setLang} />
-      <main className="dashboard-grid">
-        <PriceWidget lang={lang} />
-        <RoyaltyCard lang={lang} />
-        <FairnessIndex lang={lang} />
-        <SatelliteAlerts lang={lang} />
-        <ExtractionTable lang={lang} />
-        <ProposalList lang={lang} />
-      </main>
-    </div>
+    <ErrorBoundary>
+      <div className="app">
+        <Header lang={lang} setLang={setLang} />
+        <main className="dashboard-grid">
+          <PriceWidget lang={lang} />
+          <RoyaltyCard lang={lang} />
+          <FairnessIndex lang={lang} />
+          <SatelliteAlerts lang={lang} />
+          <ExtractionTable lang={lang} />
+          <ProposalList lang={lang} />
+        </main>
+      </div>
+    </ErrorBoundary>
   );
 }

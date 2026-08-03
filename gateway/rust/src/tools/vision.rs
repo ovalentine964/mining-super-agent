@@ -29,17 +29,20 @@ pub async fn analyze(
         Ok(resp) => {
             match resp.json::<serde_json::Value>().await {
                 Ok(result) => HttpResponse::Ok().json(result),
-                Err(e) => HttpResponse::BadGateway().json(serde_json::json!({
-                    "error": "invalid_response",
-                    "message": e.to_string()
-                })),
+                Err(e) => {
+                    tracing::error!("Vision service invalid response: {}", e);
+                    HttpResponse::BadGateway().json(serde_json::json!({
+                        "error": "invalid_response",
+                        "message": "Service returned an invalid response"
+                    }))
+                }
             }
         }
         Err(e) => {
             tracing::error!("Vision service call failed: {}", e);
             HttpResponse::BadGateway().json(serde_json::json!({
                 "error": "service_unavailable",
-                "message": format!("Vision service unreachable: {}", e)
+                "message": "Vision analysis service is temporarily unavailable"
             }))
         }
     }
@@ -59,15 +62,22 @@ pub async fn call_service(
         .timeout(std::time::Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("Vision service HTTP error ({}): {}", endpoint, e);
+            "Service temporarily unavailable".to_string()
+        })?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Service returned {}: {}", status, text));
+        tracing::error!("Vision service returned {} at {}: {}", status, endpoint, text);
+        return Err(format!("Service error (HTTP {})", status));
     }
 
     resp.json::<serde_json::Value>()
         .await
-        .map_err(|e| format!("JSON parse error: {}", e))
+        .map_err(|e| {
+            tracing::error!("Vision service JSON parse error: {}", e);
+            "Invalid response from vision service".to_string()
+        })
 }

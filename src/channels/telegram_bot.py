@@ -21,6 +21,11 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
+# Fair Deal Calculator (direct import — runs in-process, no network)
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), '..', '..'))
+from src.tools.fair_deal import evaluate_offer, evaluate_valentine_offer
+
 # ── Telegram Bot Library ─────────────────────────────────────────────────────
 # Using python-telegram-bot v20+ (async)
 from telegram import (
@@ -250,6 +255,7 @@ class TelegramBot:
         app.add_handler(CommandHandler("propose", self._handle_propose))
         app.add_handler(CommandHandler("vote", self._handle_vote))
         app.add_handler(CommandHandler("analyze", self._handle_analyze))
+        app.add_handler(CommandHandler("fairdeal", self._handle_fairdeal))
         app.add_handler(CommandHandler("help", self._handle_help))
 
         # Media handlers
@@ -284,6 +290,7 @@ class TelegramBot:
             BotCommand("status", "Show your DAO status & channels"),
             BotCommand("resources", "Browse community resources"),
             BotCommand("analyze", "Send a photo for AI analysis"),
+            BotCommand("fairdeal", "Check if a mining offer is fair"),
             BotCommand("propose", "Submit a governance proposal"),
             BotCommand("vote", "Vote on active proposals"),
             BotCommand("help", "Show all commands"),
@@ -583,6 +590,163 @@ class TelegramBot:
             parse_mode="Markdown",
         )
 
+    async def _handle_fairdeal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Fair Deal Calculator — evaluate if a mining offer is fair or exploitative."""
+        if not update.effective_user or not update.message:
+            return
+
+        user = update.effective_user
+        if not self._check_access(user.id):
+            return
+
+        session = self._get_session(update.effective_chat.id, user.id)
+
+        # If no arguments, start interactive flow
+        if not context.args:
+            session.current_mode = "awaiting_fairdeal"
+            session.context["fairdeal_step"] = "offer_amount"
+            await update.message.reply_text(
+                "⚖️ **Fair Deal Calculator**\n\n"
+                "I'll help you check if a mining offer is fair.\n\n"
+                "**Step 1:** What is the offer amount (in KES)?\n"
+                "Example: `1000000` for 1 million KES\n\n"
+                "Or use `/fairdeal valentine` for a pre-loaded analysis "
+                "of Valentine's situation in Nyatike.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Quick command: /fairdeal valentine
+        if context.args[0].lower() == "valentine":
+            await update.message.reply_text("⚖️ Calculating fair deal analysis...")
+            try:
+                verdict = evaluate_valentine_offer()
+                await self._send_fairdeal_verdict(update, verdict)
+            except Exception as e:
+                logger.exception("Fair deal calculation failed")
+                await update.message.reply_text(f"❌ Calculation failed: {e}")
+            return
+
+        # Inline: /fairdeal <amount> <mineral1,mineral2>
+        try:
+            offer_amount = float(context.args[0])
+            minerals_raw = context.args[1] if len(context.args) > 1 else "gold"
+            mineral_names = [m.strip() for m in minerals_raw.split(",")]
+
+            minerals = [
+                {"mineral": m, "estimated_kg": 100, "confidence": 0.3}
+                for m in mineral_names
+            ]
+
+            await update.message.reply_text("⚖️ Calculating fair deal analysis...")
+            verdict = evaluate_offer(
+                offer_amount_kes=offer_amount,
+                minerals=minerals,
+            )
+            await self._send_fairdeal_verdict(update, verdict)
+        except (ValueError, IndexError):
+            await update.message.reply_text(
+                "❌ Invalid format. Use:\n"
+                "`/fairdeal valentine` — pre-loaded analysis\n"
+                "`/fairdeal 1000000 gold,copper` — custom analysis",
+                parse_mode="Markdown",
+            )
+        except Exception as e:
+            logger.exception("Fair deal calculation failed")
+            await update.message.reply_text(f"❌ Calculation failed: {e}")
+
+    async def _send_fairdeal_verdict(self, update: Update, verdict):
+        """Send a bilingual fair deal verdict to the user."""
+        verdict_emoji = {
+            "FAIR": "✅",
+            "BELOW_MARKET": "⚠️",
+            "EXPLOITATIVE": "🚨",
+            "SEVERELY_EXPLOITATIVE": "🔴",
+        }.get(verdict.verdict, "❓")
+
+        text = (
+            f"{verdict_emoji} **FAIR DEAL VERDICT: {verdict.verdict}**\n\n"
+            f"**📊 Offer:** KES {verdict.offer_amount_kes:,.0f}\n"
+            f"**💰 Estimated Land Value:** KES {verdict.estimated_total_value_kes:,.0f}\n"
+            f"**⚖️ Fair Share (10-20%):** KES {verdict.fair_share_kes:,.0f}\n"
+            f"**📈 Offer/Fair Ratio:** {verdict.exploitation_ratio * 100:.1f}%\n\n"
+            f"**── Swahili ──**\n{verdict.explanation_sw}\n\n"
+            f"**── English ──**\n{verdict.explanation_en}\n"
+        )
+
+        if verdict.recommended_actions:
+            actions = "\n".join(f"• {a}" for a in verdict.recommended_actions)
+            text += f"\n**📋 Recommended Actions:**\n{actions}"
+
+        await update.message.reply_text(text, parse_mode="Markdown")
+
+    async def _handle_fairdeal_text(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE,
+        session: UserSession, text: str,
+    ):
+        """Handle multi-step fair deal conversation flow."""
+        step = session.context.get("fairdeal_step", "offer_amount")
+
+        if step == "offer_amount":
+            # Parse the offer amount
+            cleaned = text.replace(",", "").replace(" ", "").upper()
+            multiplier = 1.0
+            if cleaned.endswith("K"):
+                multiplier = 1_000;
+                cleaned = cleaned[:-1]
+            elif cleaned.endswith("M"):
+                multiplier = 1_000_000;
+                cleaned = cleaned[:-1]
+
+            try:
+                offer_amount = float(cleaned) * multiplier
+                session.context["fairdeal_offer"] = offer_amount
+                session.context["fairdeal_step"] = "minerals"
+                await update.message.reply_text(
+                    f"✅ Offer: KES {offer_amount:,.0f}\n\n"
+                    f"**Step 2:** What minerals are involved?\n"
+                    f"Example: `gold,copper` or `gold`\n\n"
+                    f"Common minerals: gold, copper, silver, coltan, cassiterite",
+                    parse_mode="Markdown",
+                )
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ Please enter a valid number. Example: `1000000` or `1M`",
+                    parse_mode="Markdown",
+                )
+            return
+
+        if step == "minerals":
+            mineral_names = [m.strip().lower() for m in text.split(",") if m.strip()]
+            if not mineral_names:
+                await update.message.reply_text("❌ Please enter at least one mineral name.")
+                return
+
+            offer_amount = session.context.get("fairdeal_offer", 0)
+            minerals = [
+                {"mineral": m, "estimated_kg": 100, "confidence": 0.3}
+                for m in mineral_names
+            ]
+
+            # Reset session state
+            session.current_mode = "default"
+            session.context.pop("fairdeal_step", None)
+            session.context.pop("fairdeal_offer", None)
+
+            await update.message.reply_text(
+                f"⚖️ Calculating: KES {offer_amount:,.0f} for {', '.join(mineral_names)}..."
+            )
+
+            try:
+                verdict = evaluate_offer(
+                    offer_amount_kes=offer_amount,
+                    minerals=minerals,
+                )
+                await self._send_fairdeal_verdict(update, verdict)
+            except Exception as e:
+                logger.exception("Fair deal calculation failed")
+                await update.message.reply_text(f"❌ Calculation failed: {e}")
+
     async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show all available commands."""
         if not update.message:
@@ -596,7 +760,8 @@ class TelegramBot:
             "/status — Your DAO status\n\n"
             "**Resources:**\n"
             "/resources — Browse community resources\n"
-            "/analyze — Send photo for AI analysis\n\n"
+            "/analyze — Send photo for AI analysis\n"
+            "/fairdeal — Check if a mining offer is fair\n\n"
             "**Governance:**\n"
             "/propose Title | Description — Submit proposal\n"
             "/vote — Vote on active proposals\n\n"
@@ -913,6 +1078,11 @@ class TelegramBot:
         if not session.is_linked and self._looks_like_link_code(text):
             context.args = [text]
             await self._handle_link(update, context)
+            return
+
+        # Multi-step fair deal flow
+        if session.current_mode == "awaiting_fairdeal":
+            await self._handle_fairdeal_text(update, context, session, text)
             return
 
         try:

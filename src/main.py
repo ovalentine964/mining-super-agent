@@ -24,6 +24,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 # Import all components
 from src.agents import list_agents, get_agent
@@ -33,7 +35,99 @@ from src.tools.fair_deal import evaluate_valentine_offer
 from src.api.routes.voice import router as voice_router
 from src.channels import get_registry, register_default_channels
 
+# ── Database Engine (SQLAlchemy connection pool) ─────────────────────────
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost:5432/sovereign_dao")
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,       # Verify connections before use
+    pool_recycle=3600,         # Recycle connections after 1 hour
+    echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 logger = logging.getLogger(__name__)
+
+
+# ── In-Memory Sliding Window Rate Limiter (fail-closed) ─────────────
+
+class InMemoryRateLimiter:
+    """Sliding window rate limiter using in-memory counters.
+    Used as fail-closed fallback when Redis is unreachable."""
+
+    def __init__(self, default_limit: int = 100, window_secs: int = 60):
+        self.default_limit = default_limit
+        self.window_secs = window_secs
+        self._counters: dict[str, list[float]] = {}
+
+    def is_allowed(self, key: str, limit: int | None = None) -> tuple[bool, int]:
+        """Check if request is allowed under rate limit.
+        Returns (allowed, current_count)."""
+        import time
+        limit = limit or self.default_limit
+        now = time.monotonic()
+        window = float(self.window_secs)
+        timestamps = self._counters.setdefault(key, [])
+        # Remove expired entries
+        timestamps[:] = [t for t in timestamps if now - t < window]
+        count = len(timestamps)
+        if count >= limit:
+            return False, count
+        timestamps.append(now)
+        return True, count + 1
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Rate limiting middleware with Redis primary + in-memory fallback.
+    NEVER fails open — blocks requests if Redis is down."""
+
+    def __init__(self, app, redis_client=None, default_limit: int = 100, window_secs: int = 60):
+        super().__init__(app)
+        self.redis = redis_client
+        self.memory_limiter = InMemoryRateLimiter(default_limit, window_secs)
+        self.default_limit = default_limit
+        self.window_secs = window_secs
+
+    async def dispatch(self, request: Request, call_next):
+        # Build rate key from client IP + path prefix
+        client_ip = request.client.host if request.client else "unknown"
+        path_prefix = request.url.path.split("/")[1] if request.url.path else "root"
+        rate_key = f"rl:{client_ip}:{path_prefix}"
+
+        redis_available = False
+        if self.redis is not None:
+            try:
+                count = await self.redis.incr(rate_key)
+                if count == 1:
+                    await self.redis.expire(rate_key, self.window_secs)
+                redis_available = True
+                if count > self.default_limit:
+                    logger.warning("Rate limit exceeded (Redis): key=%s count=%d", rate_key, count)
+                    return JSONResponse(
+                        status_code=429,
+                        content={"error": "rate_limit_exceeded", "retry_after_secs": self.window_secs},
+                    )
+            except Exception as e:
+                logger.warning("Redis rate limiting failed (%s), using in-memory fallback", e)
+
+        # Fallback: in-memory sliding window (fail-closed)
+        if not redis_available:
+            allowed, count = self.memory_limiter.is_allowed(rate_key, self.default_limit)
+            if not allowed:
+                logger.warning("Rate limit exceeded (in-memory): key=%s count=%d", rate_key, count)
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "rate_limit_exceeded", "retry_after_secs": self.window_secs},
+                )
+
+        return await call_next(request)
+
 
 # Singleton agent — created once at startup, reused for all requests
 _agent_instance = None
@@ -166,6 +260,24 @@ async def active_proposals():
     """Stub: list active proposals for the Telegram bot's /vote command."""
     return {"proposals": governance.get_active_proposals()}
 
+
+# ── Rate Limiting Middleware (Redis + in-memory fallback, fail-closed) ──
+_redis_client = None
+try:
+    import redis.asyncio as aioredis
+    _redis_url = os.environ.get("REDIS_URL", "")
+    if _redis_url:
+        _redis_client = aioredis.from_url(_redis_url, decode_responses=True)
+        logger.info("Rate limiter: Redis connected")
+except Exception as e:
+    logger.warning("Rate limiter: Redis unavailable (%s), using in-memory only", e)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    redis_client=_redis_client,
+    default_limit=int(os.environ.get("RATE_LIMIT", "100")),
+    window_secs=int(os.environ.get("RATE_WINDOW_SECS", "60")),
+)
 
 # CORS — restrict in production
 _cors_origins = os.environ.get("CORS_ORIGINS", "").strip()

@@ -9,6 +9,10 @@ import '../services/api_client.dart';
 import '../services/voice_service.dart';
 import '../services/on_device_voice.dart';
 
+/// NVIDIA API key from compile-time define.
+/// Pass via: flutter run --dart-define=NVIDIA_API_KEY=your_key
+const _nvidiaApiKey = String.fromEnvironment( 'NVIDIA_API_KEY', defaultValue: '');
+
 /// Interactive Voice Chat — Talk to the AI like a person
 ///
 /// NOT push-to-talk. This is continuous voice conversation:
@@ -61,7 +65,9 @@ class _VoiceChatScreenState extends State<VoiceChatScreen>
   @override
   void initState() {
     super.initState();
-    _cloudVoiceService = VoiceService(nvidiaApiKey: 'YOUR_NVIDIA_API_KEY');
+    _cloudVoiceService = VoiceService(
+      nvidiaApiKey: _nvidiaApiKey,
+    );
 
     // Pulse animation for listening indicator
     _pulseController = AnimationController(

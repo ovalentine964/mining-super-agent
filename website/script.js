@@ -336,7 +336,7 @@
     }
 
     function renderStats(onChain, github) {
-        const counters = document.querySelectorAll('.stat-value[data-count]');
+        const counters = document.querySelectorAll('.stat-value[data-stat-type]');
         counters.forEach(el => {
             const type = el.dataset.statType;
             if (!type) return;

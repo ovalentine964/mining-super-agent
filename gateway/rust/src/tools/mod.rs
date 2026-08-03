@@ -10,6 +10,36 @@ use registry::ToolRegistry;
 use std::sync::Arc;
 use crate::AppState;
 
+/// In-memory sliding window rate limiter.
+/// Used as a fail-closed fallback when Redis is unreachable.
+pub struct InMemoryRateLimiter {
+    counters: dashmap::DashMap<String, Vec<std::time::Instant>>,
+}
+
+impl InMemoryRateLimiter {
+    pub fn new() -> Self {
+        Self {
+            counters: dashmap::DashMap::new(),
+        }
+    }
+
+    /// Check and record a request. Returns (allowed, current_count).
+    /// Sliding window: counts requests within the last `window_secs` seconds.
+    pub fn check(&self, key: &str, limit: u64, window_secs: u64) -> (bool, u64) {
+        let now = std::time::Instant::now();
+        let window = std::time::Duration::from_secs(window_secs);
+        let mut entry = self.counters.entry(key.to_string()).or_insert_with(Vec::new);
+        // Remove expired entries
+        entry.retain(|t| now.duration_since(*t) < window);
+        let count = entry.len() as u64;
+        if count >= limit {
+            return (false, count);
+        }
+        entry.push(now);
+        (true, count + 1)
+    }
+}
+
 /// Configure all tool API routes under /api/v1
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -64,17 +94,18 @@ async fn execute_tool(
 ) -> HttpResponse {
     let tool_name = path.into_inner();
 
-    // Check rate limit via Redis
+    // ── Rate limiting (Redis primary, in-memory fallback, fail-closed) ──
     let rate_key = format!("rate:tool:{}", tool_name);
     let mut conn = state.redis.clone();
+    let redis_ok: bool;
     let current: Result<i64, _> = redis::cmd("INCR")
         .arg(&rate_key)
         .query_async(&mut conn)
         .await;
     match current {
         Ok(count) => {
+            redis_ok = true;
             if count == 1 {
-                // First request in window — set expiry
                 let _: () = redis::cmd("EXPIRE")
                     .arg(&rate_key)
                     .arg(state.config.rate_window_secs)
@@ -92,9 +123,29 @@ async fn execute_tool(
             }
         }
         Err(e) => {
-            tracing::error!("Redis INCR failed: {}", e);
-            // Fail open — allow the request
+            redis_ok = false;
+            tracing::warn!("Redis INCR failed ({}), falling back to in-memory rate limiter", e);
         }
+    }
+
+    // Fallback: in-memory sliding window when Redis is down (fail-closed)
+    if !redis_ok {
+        let mem_key = format!("memrate:{}", tool_name);
+        let (allowed, current_count) = state.rate_limiter.check(
+            &mem_key,
+            state.config.default_rate_limit,
+            state.config.rate_window_secs,
+        );
+        if !allowed {
+            return HttpResponse::TooManyRequests().json(serde_json::json!({
+                "error": "rate_limit_exceeded",
+                "tool": tool_name,
+                "limit": state.config.default_rate_limit,
+                "window_secs": state.config.rate_window_secs,
+                "source": "in_memory_fallback"
+            }));
+        }
+        tracing::debug!("In-memory rate check: tool={}, count={}", tool_name, current_count);
     }
 
     // Look up the tool
@@ -188,11 +239,13 @@ async fn execute_tool(
             }))
         }
         Err(e) => {
+            // Log full error internally (may contain internal URLs)
             tracing::error!("Tool '{}' execution failed: {}", tool_name, e);
+            // Return sanitized error to client (no internal URLs leaked)
             HttpResponse::BadGateway().json(serde_json::json!({
                 "error": "tool_execution_failed",
                 "tool": tool_name,
-                "message": e
+                "message": "Service temporarily unavailable"
             }))
         }
     }

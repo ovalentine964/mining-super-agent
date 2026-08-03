@@ -19,6 +19,8 @@ pub struct AppState {
     pub redis: redis::aio::ConnectionManager,
     pub tools: tools::ToolRegistry,
     pub oracle: Option<Arc<oracle::OracleState>>,
+    /// In-memory rate limiter — fail-closed fallback when Redis is unreachable
+    pub rate_limiter: tools::InMemoryRateLimiter,
 }
 
 #[actix_web::main]
@@ -79,6 +81,7 @@ async fn main() -> std::io::Result<()> {
         redis,
         tools,
         oracle: oracle_state,
+        rate_limiter: tools::InMemoryRateLimiter::new(),
     });
 
     HttpServer::new(move || {

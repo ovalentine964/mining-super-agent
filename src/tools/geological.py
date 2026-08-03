@@ -35,38 +35,43 @@ async def gempy_3d_model(
         resolution = [50, 50, 50]
 
     try:
-        import gempy as gp
-        import numpy as np
+        import asyncio
 
-        # Create GeoModel
-        geo_model = gp.create_geomodel(
-            project_name="mining_model",
-            extent=extent,
-            resolution=resolution,
-        )
+        def _run_gempy():
+            import gempy as gp
+            import numpy as np
 
-        # Add surface points if provided
-        if surface_points:
-            for sp in surface_points:
-                gp.add_surface_points(
-                    geo_model,
-                    coord=np.array([[sp["x"], sp["y"], sp["z"]]]),
-                    surface_names=[sp.get("formation", "unknown")],
-                )
+            # Create GeoModel
+            geo_model = gp.create_geomodel(
+                project_name="mining_model",
+                extent=extent,
+                resolution=resolution,
+            )
 
-        # Compute model
-        gp.compute_model(geo_model)
+            # Add surface points if provided
+            if surface_points:
+                for sp in surface_points:
+                    gp.add_surface_points(
+                        geo_model,
+                        coord=np.array([[sp["x"], sp["y"], sp["z"]]]),
+                        surface_names=[sp.get("formation", "unknown")],
+                    )
 
-        return {
-            "success": True,
-            "model_extent": extent,
-            "resolution": resolution,
-            "lithological_units": [
-                {"id": i, "name": f"Unit_{i}"}
-                for i in range(len(geo_model.surfaces.df))
-            ],
-            "note": "3D model computed. Export with gempy.plot_3d(geo_model)",
-        }
+            # Compute model
+            gp.compute_model(geo_model)
+
+            return {
+                "success": True,
+                "model_extent": extent,
+                "resolution": resolution,
+                "lithological_units": [
+                    {"id": i, "name": f"Unit_{i}"}
+                    for i in range(len(geo_model.surfaces.df))
+                ],
+                "note": "3D model computed. Export with gempy.plot_3d(geo_model)",
+            }
+
+        return await asyncio.to_thread(_run_gempy)
 
     except ImportError:
         logger.warning("GemPy not installed — returning mock model")
@@ -101,26 +106,31 @@ async def simpeg_inversion(
         inversion_type: Physical property to invert for
     """
     try:
-        import simpeg
-        from simpeg import maps, data_misfit, regularization, optimization
-        from simpeg import inverse_problem, directives
-        import numpy as np
+        import asyncio
 
-        # Create mesh
-        mesh = simpeg.mesh.TensorMesh([mesh_size, mesh_size, mesh_size])
+        def _run_simpeg():
+            import simpeg
+            from simpeg import maps, data_misfit, regularization, optimization
+            from simpeg import inverse_problem, directives
+            import numpy as np
 
-        # This is a simplified framework — real implementation requires
-        # proper survey setup, forward simulation, and data loading
-        return {
-            "success": True,
-            "data_type": data_type,
-            "inversion_type": inversion_type,
-            "mesh_cells": mesh_size ** 3,
-            "note": (
-                "SimPEG inversion framework initialized. "
-                "Provide survey data for full inversion."
-            ),
-        }
+            # Create mesh
+            mesh = simpeg.mesh.TensorMesh([mesh_size, mesh_size, mesh_size])
+
+            # This is a simplified framework — real implementation requires
+            # proper survey setup, forward simulation, and data loading
+            return {
+                "success": True,
+                "data_type": data_type,
+                "inversion_type": inversion_type,
+                "mesh_cells": mesh_size ** 3,
+                "note": (
+                    "SimPEG inversion framework initialized. "
+                    "Provide survey data for full inversion."
+                ),
+            }
+
+        return await asyncio.to_thread(_run_simpeg)
 
     except ImportError:
         return {
